@@ -20,7 +20,7 @@ Assembly assembly = physics.assemble(world, pieces, Viewers.nearby());
 var settings = new Settings().mode(Mode.explode(Blast.at(x, y, z, 4f)));
 assembly.simulate(null, settings, terrain, listener).thenAccept(result -> {
     for (int i = 0; i < result.count(); i++) {
-        // result.x(i), y(i), z(i), rotation(i) or block(i): where piece i settled
+        // result.x(i), y(i), z(i), rotation(i): where piece i settled
     }
     // 3. Spawn items / place blocks there, then remove the displays.
     assembly.release();
@@ -44,7 +44,6 @@ A `Hinge` gives the solid modes a start like a door swinging open: tip over an e
 Blast.everything()                                   // every piece, away from the assembly's centre
 Blast.at(x, y, z, 4f)                                // only pieces within 4 blocks of a point
 Blast.at(location, 4f)                               // same, from a Location
-Blast.at(XYZ.pack(x, y, z), 4f)                      // same, from a packed block position
 
     .force(18f)                                      // launch speed (blocks/s) at the epicenter, fading towards the edge
     .lift(0.3f)                                      // extra upward speed, as a fraction of the launch speed
@@ -68,10 +67,11 @@ impact fly forwards in a fan, the rest of the wall stays.
 | `Listener` | per-tick hook for your own sounds, particles and damage |
 | `Result` | resting position and rotation of every piece |
 | `Viewers` | who sees the displays; newcomers get them mid-flight |
-| `XYZ` | packs a block position into one `long` (27 bits x, 9 bits y, 27 bits z) |
+| `XYZ` | packs a block position into one `long` (27 bits x, 9 bits y, 27 bits z) for hash keys and key sets; `location`/`block` unpack all three at once |
 
-Positions are primitives first (`x, y, z` or one packed `long`); every method that takes them has a
-`Location` overload that defers to the primitive one, so nothing allocates on the hot path.
+Positions are primitives (`x, y, z`); every method that takes them has a `Location` overload that
+defers to the primitive one, so nothing allocates on the hot path. Packed longs are for places where the
+position is a key, like the terrain cache.
 
 Threading: the simulation never touches the world, chunks or entities. The only entity it reads is a
 player's location, through a `Platform` (plain Bukkit, or Paper/Folia's entity scheduler, which is only

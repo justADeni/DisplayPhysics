@@ -95,11 +95,6 @@ public record Blast(Epicenter epicenter, float radius, Aim aim, float force, flo
         return at(epicenter.getX(), epicenter.getY(), epicenter.getZ(), radius);
     }
 
-    /** Centred on the middle of the block at a position packed with {@link XYZ#pack}. */
-    public static Blast at(long packed, float radius) {
-        return at(XYZ.x(packed) + 0.5, XYZ.y(packed) + 0.5, XYZ.z(packed) + 0.5, radius);
-    }
-
     public Blast radius(float radius) {
         return new Blast(epicenter, radius, aim, force, lift, remainder);
     }

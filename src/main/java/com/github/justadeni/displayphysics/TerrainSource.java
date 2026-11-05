@@ -22,11 +22,6 @@ public interface TerrainSource {
     /** The type of the block at these world coordinates: {@link #AIR}, {@link #SOLID} or {@link #LIQUID}. */
     byte classify(int x, int y, int z);
 
-    /** Same as {@link #classify(int, int, int)}, for a position packed with {@link XYZ#pack}. */
-    default byte classify(long packed) {
-        return classify(XYZ.x(packed), XYZ.y(packed), XYZ.z(packed));
-    }
-
     /** Lowest block y; below it everything is solid. */
     int minY();
 

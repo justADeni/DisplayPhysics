@@ -1,6 +1,8 @@
 package com.github.justadeni.displayphysics;
 
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 
 /**
  * Packs a block position into one {@code long}, so positions can live in primitive collections
@@ -54,6 +56,15 @@ public enum XYZ {
 
     public static int z(long packed) {
         return (int) (packed << 37 >> 37);
+    }
+
+    /** The position as a new {@link Location}, decoding all three coordinates in one go. */
+    public static Location location(World world, long packed) {
+        return new Location(world, x(packed), y(packed), z(packed));
+    }
+
+    public static Block block(World world, long packed) {
+        return world.getBlockAt(x(packed), y(packed), z(packed));
     }
 
     /** The position moved by {@code dx, dy, dz}. */

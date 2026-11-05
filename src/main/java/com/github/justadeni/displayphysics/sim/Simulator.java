@@ -57,7 +57,8 @@ public final class Simulator {
 
     // Per piece
     private final int count;
-    private final float[] offX, offY, offZ;     // block corner, relative to the origin
+    /** Block corner of every piece relative to the origin, as x, y, z triples: a piece's coordinates share a cache line. */
+    private final float[] off;
     private final boolean[] hard;
     private final float[] mass;
 
@@ -94,7 +95,8 @@ public final class Simulator {
     private boolean pendingBreak;
 
     // Per tick kinematics, computed on request
-    private final float[] cx, cy, cz, speed;
+    /** Centre of every piece (x, y, z triples) and its speed, refreshed once per tick on request. */
+    private final float[] centre, speed;
     private int kinematicsTick = -1;
 
     // Scratch
@@ -126,18 +128,14 @@ public final class Simulator {
         oz = (int) Math.floor((double) sz / count);
         oy = minY;
 
-        offX = new float[count];
-        offY = new float[count];
-        offZ = new float[count];
+        off = new float[count * 3];
         this.mass = new float[count];
-        cx = new float[count];
-        cy = new float[count];
-        cz = new float[count];
+        centre = new float[count * 3];
         speed = new float[count];
         for (int i = 0; i < count; i++) {
-            offX[i] = x[i] - ox;
-            offY[i] = y[i] - oy;
-            offZ[i] = z[i] - oz;
+            off[3 * i] = x[i] - ox;
+            off[3 * i + 1] = y[i] - oy;
+            off[3 * i + 2] = z[i] - oz;
             this.mass[i] = Math.max(mass[i], 0.01f);
         }
 
@@ -189,7 +187,7 @@ public final class Simulator {
     private void buildRigidBody() {
         float totalMass = 0f;
         for (int i = 0; i < count; i++) {
-            com0.add((offX[i] + 0.5f) * mass[i], (offY[i] + 0.5f) * mass[i], (offZ[i] + 0.5f) * mass[i]);
+            com0.add((off[3 * i] + 0.5f) * mass[i], (off[3 * i + 1] + 0.5f) * mass[i], (off[3 * i + 2] + 0.5f) * mass[i]);
             totalMass += mass[i];
         }
         com0.div(totalMass);
@@ -197,7 +195,7 @@ public final class Simulator {
         // Inertia of unit cubes around the centre of mass (parallel axis theorem)
         float ixx = 0, iyy = 0, izz = 0, ixy = 0, ixz = 0, iyz = 0;
         for (int i = 0; i < count; i++) {
-            float dx = offX[i] + 0.5f - com0.x, dy = offY[i] + 0.5f - com0.y, dz = offZ[i] + 0.5f - com0.z;
+            float dx = off[3 * i] + 0.5f - com0.x, dy = off[3 * i + 1] + 0.5f - com0.y, dz = off[3 * i + 2] + 0.5f - com0.z;
             float m = mass[i], cube = m / 6f;
             ixx += cube + m * (dy * dy + dz * dz);
             iyy += cube + m * (dx * dx + dz * dz);
@@ -216,13 +214,13 @@ public final class Simulator {
         // exposed soft piece (soft pieces sink in half a block, like a cushion).
         Set<Long> occupied = new HashSet<>(count * 2);
         for (int i = 0; i < count; i++)
-            occupied.add(key(Math.round(offX[i]), Math.round(offY[i]), Math.round(offZ[i])));
+            occupied.add(key(Math.round(off[3 * i]), Math.round(off[3 * i + 1]), Math.round(off[3 * i + 2])));
 
         float baseY = hinge != null ? (float) (hinge.pivotY() - oy) : minOffY();
         Set<Long> corners = new HashSet<>();
         List<float[]> list = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            int bx = Math.round(offX[i]), by = Math.round(offY[i]), bz = Math.round(offZ[i]);
+            int bx = Math.round(off[3 * i]), by = Math.round(off[3 * i + 1]), bz = Math.round(off[3 * i + 2]);
             if (hard[i]) {
                 for (int cx = 0; cx <= 1; cx++)
                     for (int cy = 0; cy <= 1; cy++)
@@ -254,8 +252,8 @@ public final class Simulator {
 
     private float minOffY() {
         float min = Float.MAX_VALUE;
-        for (float v : offY)
-            min = Math.min(min, v);
+        for (int i = 1; i < off.length; i += 3)
+            min = Math.min(min, off[i]);
         return min;
     }
 
@@ -420,7 +418,7 @@ public final class Simulator {
 
         for (int i = 0; i < count; i++) {
             var piece = new Body();
-            body.q.transform(offX[i] + 0.5f - com0.x, offY[i] + 0.5f - com0.y, offZ[i] + 0.5f - com0.z, r);
+            body.q.transform(off[3 * i] + 0.5f - com0.x, off[3 * i + 1] + 0.5f - com0.y, off[3 * i + 2] + 0.5f - com0.z, r);
 
             piece.x.set(body.x).add(r);
             piece.q.set(body.q);
@@ -565,33 +563,33 @@ public final class Simulator {
         if (debris == null) {
             body.q.get(rot);
             // Display origin = its block corner; rotate that corner with the body.
-            rotate(rot, offX[i] - com0.x, offY[i] - com0.y, offZ[i] - com0.z, r).add(body.x);
+            rotate(rot, off[3 * i] - com0.x, off[3 * i + 1] - com0.y, off[3 * i + 2] - com0.z, r).add(body.x);
             rotation.set(body.q);
-            translation.set(r.x - offX[i], r.y - offY[i], r.z - offZ[i]);
+            translation.set(r.x - off[3 * i], r.y - off[3 * i + 1], r.z - off[3 * i + 2]);
         } else {
             Body p = debris.pieces[i];
             // Display origin sits at the cube's corner: centre - q * (0.5, 0.5, 0.5)
             p.q.transform(0.5f, 0.5f, 0.5f, r);
             rotation.set(p.q);
-            translation.set(p.x.x - r.x - offX[i], p.x.y - r.y - offY[i], p.x.z - r.z - offZ[i]);
+            translation.set(p.x.x - r.x - off[3 * i], p.x.y - r.y - off[3 * i + 1], p.x.z - r.z - off[3 * i + 2]);
         }
     }
 
     /** World position of the centre of piece {@code i}. */
     public void restingCenter(int i, double[] out) {
         computeKinematics();
-        out[0] = ox + cx[i];
-        out[1] = oy + cy[i];
-        out[2] = oz + cz[i];
+        out[0] = ox + centre[3 * i];
+        out[1] = oy + centre[3 * i + 1];
+        out[2] = oz + centre[3 * i + 2];
     }
 
     public void restingRotation(int i, Quaternionf out) {
         out.set(debris == null ? body.q : debris.pieces[i].q);
     }
 
-    public double centerX(int i) { computeKinematics(); return ox + cx[i]; }
-    public double centerY(int i) { computeKinematics(); return oy + cy[i]; }
-    public double centerZ(int i) { computeKinematics(); return oz + cz[i]; }
+    public double centerX(int i) { computeKinematics(); return ox + centre[3 * i]; }
+    public double centerY(int i) { computeKinematics(); return oy + centre[3 * i + 1]; }
+    public double centerZ(int i) { computeKinematics(); return oz + centre[3 * i + 2]; }
 
     public float speed(int i) {
         computeKinematics();
@@ -605,8 +603,8 @@ public final class Simulator {
     /** Whether the centre of piece {@code i} is touching or sunk into solid terrain. */
     public boolean touchingGround(int i) {
         computeKinematics();
-        int x = Voxels.floor(cx[i]), y = Voxels.floor(cy[i]), z = Voxels.floor(cz[i]);
-        return terrain.solid(x, y, z) || terrain.solid(x, Voxels.floor(cy[i] - GROUND_REACH), z);
+        int x = Voxels.floor(centre[3 * i]), y = Voxels.floor(centre[3 * i + 1]), z = Voxels.floor(centre[3 * i + 2]);
+        return terrain.solid(x, y, z) || terrain.solid(x, Voxels.floor(centre[3 * i + 1] - GROUND_REACH), z);
     }
 
     /** Fills in every piece's centre and speed for the current tick, once. */
@@ -618,19 +616,19 @@ public final class Simulator {
         if (debris == null) {
             body.q.get(rot);
             for (int i = 0; i < count; i++) {
-                rotate(rot, offX[i] + 0.5f - com0.x, offY[i] + 0.5f - com0.y, offZ[i] + 0.5f - com0.z, r);
+                rotate(rot, off[3 * i] + 0.5f - com0.x, off[3 * i + 1] + 0.5f - com0.y, off[3 * i + 2] + 0.5f - com0.z, r);
                 speed[i] = body.velocityAt(r, vel).length();
                 r.add(body.x);
-                cx[i] = r.x;
-                cy[i] = r.y;
-                cz[i] = r.z;
+                centre[3 * i] = r.x;
+                centre[3 * i + 1] = r.y;
+                centre[3 * i + 2] = r.z;
             }
         } else {
             for (int i = 0; i < count; i++) {
                 Body p = debris.pieces[i];
-                cx[i] = p.x.x;
-                cy[i] = p.x.y;
-                cz[i] = p.x.z;
+                centre[3 * i] = p.x.x;
+                centre[3 * i + 1] = p.x.y;
+                centre[3 * i + 2] = p.x.z;
                 speed[i] = p.v.length();
             }
         }

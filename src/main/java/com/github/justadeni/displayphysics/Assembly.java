@@ -35,7 +35,9 @@ public final class Assembly {
 
     private static final long TICK_NANOS = 50_000_000L;
     private static final int VIEWER_REFRESH_TICKS = 20;
-    private static final int POSE_STRIDE = 7;
+    /** Floats per pose: qx qy qz qw tx ty tz + 1 padding, so two poses fill a 64-byte cache line and none straddles two. */
+    private static final int POSE_STRIDE = 8;
+    private static final int POSE_VALUES = 7;
     private static final float VIEW_RANGE = 3f;
 
     private final Logger logger;
@@ -244,7 +246,7 @@ public final class Assembly {
             int o = i * POSE_STRIDE;
             // Pieces at rest keep their pose: sending it again would only restart their interpolation
             boolean same = true;
-            for (int k = o; k < o + POSE_STRIDE; k++)
+            for (int k = o; k < o + POSE_VALUES; k++)
                 if (pose[k] != sent[k]) {
                     same = false;
                     break;
