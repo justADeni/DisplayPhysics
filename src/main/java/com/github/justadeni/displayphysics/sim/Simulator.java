@@ -583,6 +583,18 @@ public final class Simulator {
         }
     }
 
+    /**
+     * Which pieces an eye at this world position can see (by piece). While the assembly is still one body there is
+     * nothing to cull, and everything is visible.
+     */
+    public void visibility(double ex, double ey, double ez, float maxDistance, float spacing, boolean piecesOcclude, boolean[] visibleByPiece) {
+        if (debris == null) {
+            java.util.Arrays.fill(visibleByPiece, 0, count, true);
+            return;
+        }
+        debris.visibility((float) (ex - ox), (float) (ey - oy), (float) (ez - oz), maxDistance, spacing, piecesOcclude, visibleByPiece);
+    }
+
     /** World position of the centre of piece {@code i}. */
     public void restingCenter(int i, double[] out) {
         computeKinematics();

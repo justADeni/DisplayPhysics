@@ -234,6 +234,55 @@ public final class ScalarKernels implements Kernels {
         }
     }
 
+    // ── Visibility ───────────────────────────────────────────────────────────
+
+    /** Where on a piece the lines of sight end: its centre and four corners spread around it. */
+    static final float[] SIGHT_POINTS = {0f, 0f, 0f, .4f, .4f, .4f, -.4f, .4f, -.4f, .4f, -.4f, -.4f, -.4f, -.4f, .4f};
+
+    /** A piece never hides itself or its immediate neighbours: samples this close to the line's end ignore the pieces. */
+    static final float SELF_CLEARANCE = 0.8f;
+
+    static void lineOfSight(Bodies b, int from, int to, Grid grid, byte[] occupancy, float ex, float ey, float ez,
+                           float maxDistance, float spacing, boolean[] out) {
+        float maxSquared = maxDistance * maxDistance;
+        byte[] cells = grid.cells;
+        for (int i = from; i < to; i++) {
+            float cx = b.px[i], cy = b.py[i], cz = b.pz[i];
+            float dx = cx - ex, dy = cy - ey, dz = cz - ez;
+            float distanceSquared = dx * dx + dy * dy + dz * dz;
+            if (distanceSquared > maxSquared) {
+                out[i] = false;
+                continue;
+            }
+            if (distanceSquared < 4f) {
+                out[i] = true;
+                continue;
+            }
+
+            boolean seen = false;
+            for (int point = 0; point < 5 && !seen; point++) {
+                float rx = cx + SIGHT_POINTS[3 * point] - ex, ry = cy + SIGHT_POINTS[3 * point + 1] - ey, rz = cz + SIGHT_POINTS[3 * point + 2] - ez;
+                float length = (float) Math.sqrt(rx * rx + ry * ry + rz * rz);
+                int steps = Math.max(1, (int) Math.ceil(length / spacing));
+                float inverse = 1f / steps;
+
+                boolean blocked = false;
+                for (int s = 0; s < steps && !blocked; s++) {
+                    float f = (s + 0.5f) * inverse;
+                    int x = Grid.floor(ex + rx * f), y = Grid.floor(ey + ry * f), z = Grid.floor(ez + rz * f);
+                    // Outside the tracked area nothing is known, so nothing blocks
+                    if (x >= grid.x0 && x < grid.x0 + grid.sx && y >= grid.y0 && y < grid.y0 + grid.sy && z >= grid.z0 && z < grid.z0 + grid.sz) {
+                        int index = grid.index(x, y, z);
+                        blocked = (cells[index] & Grid.TYPE_MASK) == Grid.SOLID
+                                || (occupancy != null && occupancy[index] != 0 && (1f - f) * length > SELF_CLEARANCE);
+                    }
+                }
+                seen = !blocked;
+            }
+            out[i] = seen;
+        }
+    }
+
     // ── Calm ─────────────────────────────────────────────────────────────────
 
     @Override

@@ -113,6 +113,46 @@ public final class FlatDebris {
         return (float) Math.sqrt(b.speedSquared(b.slot[piece]));
     }
 
+    // ── Visibility ───────────────────────────────────────────────────────────
+
+    private boolean[] visibleBySlot = new boolean[0];
+    private byte[] occupancy = new byte[0];
+
+    /**
+     * Which pieces can be seen from an eye (relative to the simulation's origin). The result is by piece.
+     * Pieces that came to rest are reported visible: they no longer change, and a viewer that has not seen
+     * their last move needs it.
+     */
+    public void visibility(float ex, float ey, float ez, float maxDistance, float spacing, boolean piecesOcclude, boolean[] visibleByPiece) {
+        int awake = b.awake;
+        if (visibleBySlot.length < awake)
+            visibleBySlot = new boolean[b.capacity];
+        if (awake > 0) {
+            kernels.visibility(b, 0, awake, grid, piecesOcclude ? occupancyOfMovingPieces(awake) : null, ex, ey, ez, maxDistance, spacing, visibleBySlot);
+        }
+        for (int s = 0; s < awake; s++)
+            visibleByPiece[b.id[s]] = visibleBySlot[s];
+        for (int s = awake; s < b.capacity; s++)
+            visibleByPiece[b.id[s]] = true;
+    }
+
+    /** Counts, per terrain-grid voxel, the moving pieces whose centre is in it. */
+    private byte[] occupancyOfMovingPieces(int awake) {
+        if (occupancy.length != grid.cells.length)
+            occupancy = new byte[grid.cells.length];
+        else
+            Arrays.fill(occupancy, (byte) 0);
+        for (int s = 0; s < awake; s++) {
+            int x = Grid.floor(b.px[s]), y = Grid.floor(b.py[s]), z = Grid.floor(b.pz[s]);
+            if (x >= grid.x0 && x < grid.x0 + grid.sx && y >= grid.y0 && y < grid.y0 + grid.sy && z >= grid.z0 && z < grid.z0 + grid.sz) {
+                int index = grid.index(x, y, z);
+                if (occupancy[index] < Byte.MAX_VALUE)
+                    occupancy[index]++;
+            }
+        }
+        return occupancy;
+    }
+
     // ── Stepping ─────────────────────────────────────────────────────────────
 
     /** Advances one tick; returns whether every piece has come to rest. */

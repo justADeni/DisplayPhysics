@@ -17,6 +17,8 @@ public final class Settings {
     public boolean softCollides = true;
     /** Whether the SIMD kernels may be used when the JVM has them (it needs --add-modules jdk.incubator.vector). */
     public boolean simd = true;
+    /** Hide pieces from players who can't see them, or {@code null} to send everything to everyone. */
+    public Occlusion occlusion = null;
     /** Hard cap on the whole simulation, in seconds. */
     public float maxDuration = 30f;
     /** How violently pieces fly apart when they shatter on impact (not for explosions, which have their own force). */
@@ -29,6 +31,7 @@ public final class Settings {
     public float autoReleaseSeconds = 60f;
 
     public Settings mode(Mode v) { mode = Objects.requireNonNull(v); return this; }
+    public Settings occlusion(Occlusion v) { occlusion = v; return this; }
     public Settings simd(boolean v) { simd = v; return this; }
     public Settings gravity(float v) { gravity = v; return this; }
     public Settings friction(float v) { friction = v; return this; }

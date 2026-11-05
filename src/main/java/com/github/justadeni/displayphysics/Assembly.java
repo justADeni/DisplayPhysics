@@ -4,6 +4,7 @@ import com.github.justadeni.displayphysics.net.Packets;
 import com.github.justadeni.displayphysics.platform.Platform;
 import org.bukkit.Bukkit;
 import com.github.justadeni.displayphysics.sim.Simulator;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.joml.Quaternionf;
@@ -11,7 +12,7 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,6 +40,8 @@ public final class Assembly {
     private static final int POSE_STRIDE = 8;
     private static final int POSE_VALUES = 7;
     private static final float VIEW_RANGE = 3f;
+    /** Roughly where a standing player's eyes are above their feet. */
+    private static final double EYE_HEIGHT = 1.62;
 
     private final Logger logger;
     private final Platform platform;
@@ -53,7 +56,19 @@ public final class Assembly {
     private final Object[][] spawnPlain, spawnGlow;
     private final boolean anyGlow;
 
-    private final Set<Player> shown = ConcurrentHashMap.newKeySet();
+    /** A player the displays are shown to. */
+    private static final class Watcher {
+        volatile double eyeX, eyeY, eyeZ;
+        volatile boolean located;
+        /** With occlusion on: the pose this player was last sent for each piece, and which pieces they can see. */
+        float[] sent;
+        boolean[] visible;
+    }
+
+    private final Map<Player, Watcher> shown = new ConcurrentHashMap<>();
+    /** Set when a simulation starts with occlusion culling on. */
+    private volatile Occlusion occlusion;
+    private Object[] frameCache = new Object[0];
     private final AtomicBoolean released = new AtomicBoolean();
     private final double centerX, centerY, centerZ;
 
@@ -142,7 +157,7 @@ public final class Assembly {
         if (!released.compareAndSet(false, true))
             return;
         Object remove = Packets.remove(ids);
-        for (Player player : shown)
+        for (Player player : shown.keySet())
             Packets.send(player, remove);
         shown.clear();
     }
@@ -167,6 +182,8 @@ public final class Assembly {
         }
 
         Simulator sim = new Simulator(x, y, z, hard, mass, hinge, settings, terrain);
+        enableOcclusion(settings.occlusion);
+        int refreshTicks = settings.occlusion == null ? VIEWER_REFRESH_TICKS : Math.min(VIEWER_REFRESH_TICKS, settings.occlusion.everyTicks());
         TickView view = new TickView(sim);
         float[] pose = new float[count * POSE_STRIDE];
         Quaternionf q = new Quaternionf();
@@ -181,6 +198,8 @@ public final class Assembly {
             boolean done = false;
             while (!done && !released.get()) {
                 done = sim.step();
+                if (settings.occlusion != null && sim.broken() && sim.tick() % settings.occlusion.everyTicks() == 0)
+                    updateVisibility(sim, settings.occlusion);
 
                 for (int i = 0; i < count; i++) {
                     sim.pose(i, q, t);
@@ -192,7 +211,7 @@ public final class Assembly {
                 // the last pose is always sent.
                 unsent++;
                 if (unsent >= settings.updateInterval || done) {
-                    publish(pose, unsent);
+                    publish(pose, unsent, done);
                     unsent = 0;
                 }
 
@@ -206,7 +225,7 @@ public final class Assembly {
                     listener.onTick(view);
                 }
 
-                if (sim.tick() % VIEWER_REFRESH_TICKS == 0)
+                if (sim.tick() % refreshTicks == 0)
                     refreshViewers();
 
                 if (!done) {
@@ -239,8 +258,16 @@ public final class Assembly {
         return new Result(positions, rotations, sim.broken(), sim.tick(), error);
     }
 
-    /** Sends the pieces that moved since the last frame, bundled, to everyone watching. */
-    private synchronized void publish(float[] pose, int ticks) {
+    /**
+     * Sends the pieces that moved since the last frame, bundled. Without occlusion everyone gets the same
+     * bundle; with it each player gets only the pieces they can see (all of them on the last frame, so nothing
+     * is left where it was last seen).
+     */
+    private synchronized void publish(float[] pose, int ticks, boolean last) {
+        if (occlusion != null) {
+            publishCulled(pose, ticks, last);
+            return;
+        }
         List<Object> packets = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             int o = i * POSE_STRIDE;
@@ -254,21 +281,79 @@ public final class Assembly {
             if (same)
                 continue;
             System.arraycopy(pose, o, sent, o, POSE_STRIDE);
-            packets.add(posePacket(i, ticks));
+            packets.add(posePacket(sent, i, ticks));
         }
         anySent = true;
         if (packets.isEmpty() || released.get())
             return;
 
         Object bundle = Packets.bundle(packets);
-        for (Player player : shown)
+        for (Player player : shown.keySet())
             Packets.send(player, bundle);
     }
 
-    private Object posePacket(int piece, int ticks) {
+    private void publishCulled(float[] pose, int ticks, boolean last) {
+        if (frameCache.length < count)
+            frameCache = new Object[count];
+        System.arraycopy(pose, 0, sent, 0, count * POSE_STRIDE); // the latest pose of everything, for whoever arrives next
+        anySent = true;
+        if (released.get())
+            return;
+
+        for (Map.Entry<Player, Watcher> entry : shown.entrySet()) {
+            Watcher watcher = entry.getValue();
+            if (watcher.sent == null)
+                continue;
+            List<Object> packets = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                if (!last && !watcher.visible[i])
+                    continue;
+                int o = i * POSE_STRIDE;
+                boolean same = true;
+                for (int k = o; k < o + POSE_VALUES; k++)
+                    if (pose[k] != watcher.sent[k]) {
+                        same = false;
+                        break;
+                    }
+                if (same)
+                    continue;
+                System.arraycopy(pose, o, watcher.sent, o, POSE_STRIDE);
+                // One packet per piece per frame, shared by everyone who gets it
+                packets.add(frameCache[i] != null ? frameCache[i] : (frameCache[i] = posePacket(pose, i, ticks)));
+            }
+            if (!packets.isEmpty())
+                Packets.send(entry.getKey(), Packets.bundle(packets));
+        }
+        java.util.Arrays.fill(frameCache, 0, count, null);
+    }
+
+    private Object posePacket(float[] source, int piece, int ticks) {
         int o = piece * POSE_STRIDE;
-        return Packets.pose(ids[piece], ticks, new Vector3f(sent[o + 4], sent[o + 5], sent[o + 6]),
-                new Quaternionf(sent[o], sent[o + 1], sent[o + 2], sent[o + 3]));
+        return Packets.pose(ids[piece], ticks, new Vector3f(source[o + 4], source[o + 5], source[o + 6]),
+                new Quaternionf(source[o], source[o + 1], source[o + 2], source[o + 3]));
+    }
+
+    // ── Occlusion ────────────────────────────────────────────────────────────
+
+    /** Starts per-player bookkeeping for everyone already watching. */
+    private synchronized void enableOcclusion(Occlusion occlusion) {
+        this.occlusion = occlusion;
+        if (occlusion != null)
+            for (Watcher watcher : shown.values())
+                prepare(watcher);
+    }
+
+    private void prepare(Watcher watcher) {
+        watcher.sent = sent.clone();
+        watcher.visible = new boolean[count];
+        java.util.Arrays.fill(watcher.visible, true);
+    }
+
+    /** Recomputes which pieces each player can see from where they stand. */
+    private void updateVisibility(Simulator sim, Occlusion occlusion) {
+        for (Watcher watcher : shown.values())
+            if (watcher.located && watcher.visible != null)
+                sim.visibility(watcher.eyeX, watcher.eyeY, watcher.eyeZ, occlusion.maxDistance(), occlusion.spacing(), occlusion.pieces(), watcher.visible);
     }
 
     // ── Viewers ──────────────────────────────────────────────────────────────
@@ -281,21 +366,22 @@ public final class Assembly {
         if (released.get() || !refreshing.compareAndSet(false, true))
             return CompletableFuture.completedFuture(null);
 
-        List<CompletableFuture<Player>> checks = new ArrayList<>();
+        record Seen(Player player, Location at) {}
+        List<CompletableFuture<Seen>> checks = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!player.getWorld().equals(world))
                 continue;
             checks.add(platform.locate(player).handle((at, error) ->
-                    at != null && error == null && viewers.sees(player, at, centerX, centerY, centerZ) ? player : null));
+                    at != null && error == null && viewers.sees(player, at, centerX, centerY, centerZ) ? new Seen(player, at) : null));
         }
 
         return CompletableFuture.allOf(checks.toArray(CompletableFuture[]::new)).handle((done, error) -> {
             try {
-                Set<Player> now = ConcurrentHashMap.newKeySet();
-                for (CompletableFuture<Player> check : checks) {
-                    Player player = check.getNow(null);
-                    if (player != null)
-                        now.add(player);
+                Map<Player, Location> now = new java.util.HashMap<>();
+                for (CompletableFuture<Seen> check : checks) {
+                    Seen seen = check.getNow(null);
+                    if (seen != null)
+                        now.put(seen.player(), seen.at());
                 }
                 apply(now);
             } catch (RuntimeException e) {
@@ -307,13 +393,13 @@ public final class Assembly {
         });
     }
 
-    private synchronized void apply(Set<Player> now) {
+    private synchronized void apply(Map<Player, Location> now) {
         if (released.get())
             return;
 
         Object remove = null;
-        for (Player player : shown) {
-            if (now.contains(player) && player.isOnline())
+        for (Player player : shown.keySet()) {
+            if (now.containsKey(player) && player.isOnline())
                 continue;
             if (remove == null)
                 remove = Packets.remove(ids);
@@ -321,9 +407,24 @@ public final class Assembly {
             shown.remove(player);
         }
 
-        for (Player player : now) {
-            if (!shown.add(player))
+        for (Map.Entry<Player, Location> entry : now.entrySet()) {
+            Player player = entry.getKey();
+            Location at = entry.getValue();
+            Watcher watcher = shown.get(player);
+            boolean arriving = watcher == null;
+            if (arriving)
+                watcher = new Watcher();
+            // Where their eyes are, for occlusion
+            watcher.eyeX = at.getX();
+            watcher.eyeY = at.getY() + EYE_HEIGHT;
+            watcher.eyeZ = at.getZ();
+            watcher.located = true;
+            if (!arriving)
                 continue;
+
+            if (occlusion != null)
+                prepare(watcher);
+            shown.put(player, watcher);
             boolean glow = anyGlow && viewers.seesGlow(player);
             List<Object> packets = new ArrayList<>(count * 3);
             for (int i = 0; i < count; i++)
@@ -331,7 +432,7 @@ public final class Assembly {
             // Someone arriving mid-fall sees the pieces where they are now
             if (anySent)
                 for (int i = 0; i < count; i++)
-                    packets.add(posePacket(i, 0));
+                    packets.add(posePacket(sent, i, 0));
             Packets.send(player, Packets.bundle(packets));
         }
     }
