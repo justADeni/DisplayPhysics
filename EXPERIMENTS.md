@@ -3,7 +3,7 @@
 Goal: a `VectorKernels` (Vector API) that is **at least 2x faster than `ScalarKernels` on the `terrain` kernel at some
 batch size** (and not slower anywhere that matters), then the same in the whole engine (`FlatDebrisBenchmark`).
 
-## What exists (commit 612a562 on `main`)
+## What exists (commit 1106a5d on `main`)
 
 - `Bodies`: structure-of-arrays state, awake pieces in slots `[0, awake)`.
 - `Grid`: dense `byte[]` terrain, one byte per voxel: type in the low 2 bits (`TYPE_MASK`), and for solid voxels the
@@ -53,7 +53,7 @@ batch size** (and not slower anywhere that matters), then the same in the whole 
   (Windows: `cmd /c start /wait /b /affinity <HEXMASK> java ...`, or PowerShell `Start-Process` + `ProcessorAffinity`) so
   you neither disturb nor are disturbed. Single-threaded runs only. Always measure scalar and vector in the same session.
 - Work in your own git worktree:
-  `git -C C:/Users/Deni/IdeaProjects/DisplayPhysics worktree add C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/<name> -b exp/<name> 612a562`
+  `git -C C:/Users/Deni/IdeaProjects/DisplayPhysics worktree add C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/<name> -b exp/<name> 1106a5d`
   Commit your work on that branch. Save JMH JSON under `benchmarks/` in your worktree.
 - Iterate: measure, profile (`-XX:+PrintCompilation`, `-XX:+UnlockDiagnosticVMOptions -XX:+PrintInlining`, look for
   `COMPILE SKIPPED` and allocations), change one thing, measure again. Keep a log of what each change did to ns/piece.
