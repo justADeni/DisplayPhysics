@@ -7,7 +7,7 @@ blocks as one solid unit, optionally breaks it into single blocks when it hits s
 fast, sends every frame straight from its own thread (bundled, so all clients apply a frame
 together), and hands back where each block came to rest.
 
-Supports Paper 26.1, 26.2, 26.3 and newer (Mojang-mapped servers). `DisplayPhysics.isSupported()`
+Supports Spigot, Paper and Folia 26.1, 26.2, 26.3 and newer (servers using Mojang's class names). Only the Bukkit API is used; the sole server-internal access is building and sending the packets. `DisplayPhysics.isSupported()`
 tells you whether the current server can be used.
 
 ```java

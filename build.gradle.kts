@@ -15,14 +15,17 @@ java {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
     maven { url = uri("https://repo.papermc.io/repository/maven-public/") }
 }
 
 dependencies {
-    // Paper provides JOML, fastutil and the NMS classes the packet layer talks to at runtime.
-    compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
+    // Compiled against Spigot's API so nothing Paper-only can slip in. The server provides JOML and fastutil.
+    compileOnly("org.spigotmc:spigot-api:26.1.2-R0.1-SNAPSHOT")
+    compileOnly("it.unimi.dsi:fastutil:8.5.15")
 
-    testImplementation("io.papermc.paper:paper-api:26.1.2.build.+")
+    testImplementation("org.spigotmc:spigot-api:26.1.2-R0.1-SNAPSHOT")
+    testImplementation("it.unimi.dsi:fastutil:8.5.15")
     testImplementation(platform("org.junit:junit-bom:5.11.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

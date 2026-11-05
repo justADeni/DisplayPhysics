@@ -23,8 +23,8 @@ import java.util.logging.Logger;
  * });
  * }</pre>
  *
- * <p>Runs on Paper 26.1 and newer (Spigot and older servers don't expose the classes it needs;
- * check {@link #isSupported()}).
+ * <p>Runs on Spigot, Paper and Folia 26.1 and newer, which all use Mojang's class names; only
+ * the Bukkit API is used otherwise. Check {@link #isSupported()} on older servers.
  */
 public final class DisplayPhysics {
 
@@ -53,7 +53,7 @@ public final class DisplayPhysics {
     /** @param logger where problems are reported */
     public static DisplayPhysics create(Logger logger) {
         if (!Packets.available())
-            throw new UnsupportedOperationException("DisplayPhysics needs Paper 26.1 or newer", Packets.failure());
+            throw new UnsupportedOperationException("DisplayPhysics needs a server 26.1 or newer", Packets.failure());
         return new DisplayPhysics(logger);
     }
 

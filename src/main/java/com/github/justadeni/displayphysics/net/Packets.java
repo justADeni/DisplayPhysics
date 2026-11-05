@@ -1,6 +1,9 @@
 package com.github.justadeni.displayphysics.net;
 
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.joml.Quaternionfc;
@@ -29,18 +32,21 @@ public final class Packets {
     private Packets() {}
 
     private static final String NMS = "net.minecraft.";
-    private static final String CRAFT = "org.bukkit.craftbukkit.";
+    /** CraftBukkit's package: unversioned on current servers, but read from the running server to be safe. */
+    private static final String CRAFT = Bukkit.getServer() != null
+            ? Bukkit.getServer().getClass().getPackageName() + "."
+            : "org.bukkit.craftbukkit.";
 
     private static final Throwable FAILURE;
 
-    private static final MethodHandle WORLD_HANDLE, NEXT_ENTITY_ID, BLOCK_STATE, PLAYER_HANDLE, CONNECTION, SEND;
+    private static final MethodHandle BLOCK_STATE, PLAYER_HANDLE, CONNECTION, SEND;
     private static final MethodHandle ADD_ENTITY, SET_DATA, REMOVE, BUNDLE, DATA_VALUE;
     private static final Object BLOCK_DISPLAY_TYPE, VEC3_ZERO;
     private static final Object BLOCK_STATE_KEY, VIEW_RANGE_KEY, SHARED_FLAGS_KEY, GLOW_COLOR_KEY;
     private static final Object START_DELTA_KEY, DURATION_KEY, TRANSLATION_KEY, ROTATION_KEY;
 
     static {
-        MethodHandle worldHandle = null, nextEntityId = null, blockState = null, playerHandle = null, connection = null, send = null;
+        MethodHandle blockState = null, playerHandle = null, connection = null, send = null;
         MethodHandle addEntity = null, setData = null, remove = null, bundle = null, dataValue = null;
         Object blockDisplayType = null, vec3Zero = null;
         Object blockStateKey = null, viewRangeKey = null, sharedFlagsKey = null, glowColorKey = null;
@@ -49,19 +55,6 @@ public final class Packets {
 
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
-
-            Class<?> craftWorld = Class.forName(CRAFT + "CraftWorld");
-            Class<?> level = Class.forName(NMS + "world.level.Level");
-            worldHandle = lookup.unreflect(craftWorld.getMethod("getHandle"));
-            try {
-                // 26.3+: the level hands out ids
-                nextEntityId = lookup.unreflect(level.getMethod("getNextEntityId"));
-            } catch (NoSuchMethodException e) {
-                // 26.1, 26.2: one global counter on Entity
-                Class<?> entityClass = Class.forName(NMS + "world.entity.Entity");
-                nextEntityId = MethodHandles.dropArguments(lookup.unreflect(entityClass.getMethod("nextEntityId")), 0, Object.class);
-                worldHandle = MethodHandles.dropArguments(MethodHandles.constant(Object.class, null), 0, World.class);
-            }
 
             Class<?> craftBlockData = Class.forName(CRAFT + "block.data.CraftBlockData");
             blockState = lookup.unreflect(craftBlockData.getMethod("getState"));
@@ -109,8 +102,6 @@ public final class Packets {
         }
 
         FAILURE = failure;
-        WORLD_HANDLE = worldHandle;
-        NEXT_ENTITY_ID = nextEntityId;
         BLOCK_STATE = blockState;
         PLAYER_HANDLE = playerHandle;
         CONNECTION = connection;
@@ -185,13 +176,12 @@ public final class Packets {
 
     // ── Building ─────────────────────────────────────────────────────────────
 
-    /** A fresh entity id that can't clash with any real entity. */
+    /**
+     * A fresh entity id that can't clash with any real entity. Taken from an entity the API
+     * creates without adding it to the world, so it comes from the server's own counter.
+     */
     public static int nextEntityId(World world) {
-        try {
-            return (int) NEXT_ENTITY_ID.invoke(WORLD_HANDLE.invoke(world));
-        } catch (Throwable t) {
-            throw rethrow(t);
-        }
+        return world.createEntity(new Location(world, 0, 0, 0), BlockDisplay.class).getEntityId();
     }
 
     /** The server's own representation of the block, which the display packets carry. */
