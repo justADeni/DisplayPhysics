@@ -11,6 +11,13 @@ public enum BreakMode {
      * {@link Settings#breakSpeed}, or has tumbled for {@link Settings#maxRigidSeconds}, or comes to rest
      * (whichever is first). Then every block becomes its own body and scatters.
      */
-    BREAK_ON_IMPACT
+    BREAK_ON_IMPACT,
+
+    /**
+     * There is no solid stage at all: the blocks are separate bodies from the first tick and
+     * simply collapse, falling, tumbling and piling up. A {@link Hinge} is ignored and
+     * {@link Settings#scatter} only adds a small nudge (a fifth of its usual strength).
+     */
+    FALL_APART
 
 }

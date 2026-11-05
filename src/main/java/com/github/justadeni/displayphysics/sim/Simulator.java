@@ -88,6 +88,7 @@ public final class Simulator {
     private final Vector3f impactAt = new Vector3f();
     private final Vector3f lastImpact = new Vector3f();
     private boolean brokeNow;
+    private boolean pendingBreak;
 
     // Per tick kinematics, computed on request
     private final float[] cx, cy, cz, speed;
@@ -148,7 +149,11 @@ public final class Simulator {
 
         buildRigidBody();
 
-        if (hinge != null) {
+        if (settings.breakMode == BreakMode.FALL_APART) {
+            // No solid stage: the blocks are separate bodies from the start
+            splitIntoDebris(0.2f);
+            pendingBreak = true;
+        } else if (hinge != null) {
             hingeAxis.set(hinge.axis());
             hingeAxis.y = 0;
             if (hingeAxis.lengthSquared() < 1e-6f)
@@ -251,7 +256,8 @@ public final class Simulator {
 
         tick++;
         impact = 0f;
-        brokeNow = false;
+        brokeNow = pendingBreak;
+        pendingBreak = false;
         refreshTerrain();
 
         switch (phase) {
@@ -325,7 +331,7 @@ public final class Simulator {
             if (splitAt < 0 && (impact >= settings.breakSpeed || freeTicks >= maxRigidTicks || settled))
                 splitAt = tick + (settled ? 0 : settings.breakDelay);
             if (splitAt >= 0 && tick >= splitAt)
-                splitIntoDebris();
+                splitIntoDebris(1f);
         } else if (settled) {
             phase = Phase.DONE;
         }
@@ -375,10 +381,10 @@ public final class Simulator {
 
     // ── Debris phase ─────────────────────────────────────────────────────────
 
-    private void splitIntoDebris() {
+    private void splitIntoDebris(float scatterScale) {
         Body[] pieces = new Body[count];
 
-        float scatter = settings.scatter;
+        float scatter = settings.scatter * scatterScale;
         Vector3f out = new Vector3f();
 
         for (int i = 0; i < count; i++) {
@@ -411,6 +417,7 @@ public final class Simulator {
         debris = new Debris(terrain, pieces, hard, settings.gravity, settings.friction, settings.bounciness, settings.softBounciness);
         phase = Phase.DEBRIS;
         brokeNow = true;
+        pendingBreak = false;
     }
 
     // ── Reading the state ────────────────────────────────────────────────────

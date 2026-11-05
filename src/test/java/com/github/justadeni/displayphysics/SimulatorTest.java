@@ -70,4 +70,18 @@ class SimulatorTest {
         sim.restingCenter(0, at);
         assertTrue(at[1] > 63.4 && at[1] < 66);
     }
+
+    @Test
+    void fallApartStartsAsSeparateBlocksAndCollapses() {
+        Simulator sim = tree(BreakMode.FALL_APART, hinge());
+        assertTrue(sim.broken(), "should be separate bodies from the start");
+        sim.step();
+        assertTrue(sim.brokeThisTick(), "the break is reported on the first tick");
+        run(sim);
+        double[] at = new double[3];
+        for (int i = 0; i < sim.count(); i++) {
+            sim.restingCenter(i, at);
+            assertTrue(at[1] > 63.3 && at[1] < 66, "piece " + i + " ended at " + at[1]);
+        }
+    }
 }
