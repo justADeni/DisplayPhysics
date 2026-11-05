@@ -22,17 +22,16 @@ public interface Kernels {
     void calm(Bodies b, int from, int to);
 
     /**
-     * Whether each awake piece in {@code [from, to)} can be seen from an eye: some line from the eye to a few
-     * points of the piece must run through the terrain grid without meeting a solid voxel. Pieces further than
-     * {@code maxDistance} are not visible; lines leaving the grid count as clear. Results are by slot.
+     * Whether each awake piece in {@code [from, to)} can be seen by a viewer: it must be near enough, inside their
+     * view cone, and some line from their eye to a few points of the piece must run through the terrain grid
+     * without meeting a solid voxel (or, with {@code occupancy}, another moving piece). Lines leaving the grid
+     * count as clear. Results are by slot.
      *
-     * @param spacing   distance between samples along a line
      * @param occupancy per grid voxel, how many moving pieces have their centre in it (so it blocks sight, except
      *                  near the line's own target), or {@code null} to let only the terrain block
      */
-    default void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, float ex, float ey, float ez,
-                            float maxDistance, float spacing, boolean[] out) {
-        ScalarKernels.lineOfSight(b, from, to, grid, occupancy, ex, ey, ez, maxDistance, spacing, out);
+    default void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
+        ScalarKernels.lineOfSight(b, from, to, grid, occupancy, sight, out);
     }
 
     static Kernels scalar() {

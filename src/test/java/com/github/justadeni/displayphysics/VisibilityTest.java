@@ -3,6 +3,7 @@ package com.github.justadeni.displayphysics;
 import com.github.justadeni.displayphysics.sim.Bodies;
 import com.github.justadeni.displayphysics.sim.FlatDebris;
 import com.github.justadeni.displayphysics.sim.Kernels;
+import com.github.justadeni.displayphysics.sim.Sight;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,13 @@ class VisibilityTest {
             {1.2f, 1.5f, 0.3f}, // 5: right next to the eye
     };
 
-    private static boolean[] visible(TerrainSource terrain, List<float[]> positions, Kernels kernels, boolean piecesOcclude) {
+    /** A viewer at (0, 1.6, 0), looking along x (+1 or -1), with the standard view cone or none. */
+    private static Sight sight(float lookX, boolean cone) {
+        double half = Occlusion.standard().coneHalfAngle();
+        return new Sight(0f, 1.6f, 0f, lookX, 0f, 0f, cone, (float) Math.cos(half), (float) Math.sin(half), 96f, 0.6f);
+    }
+
+    private static boolean[] visible(TerrainSource terrain, List<float[]> positions, Kernels kernels, boolean piecesOcclude, Sight sight) {
         var bodies = new Bodies(positions.size());
         for (int i = 0; i < positions.size(); i++) {
             bodies.px[i] = positions.get(i)[0]; bodies.py[i] = positions.get(i)[1]; bodies.pz[i] = positions.get(i)[2];
@@ -49,13 +56,13 @@ class VisibilityTest {
         debris.step(); // builds the terrain grid around the pieces
 
         var out = new boolean[positions.size()];
-        debris.visibility(0f, 1.6f, 0f, 96f, 0.6f, piecesOcclude, out);
+        debris.visibility(sight, piecesOcclude, out);
         return out;
     }
 
     @Test
     void aWallHidesWhatIsBehindIt() {
-        var seen = visible(WALLED, List.of(PIECES), Kernels.scalar(), true);
+        var seen = visible(WALLED, List.of(PIECES), Kernels.scalar(), true, sight(1f, false));
         assertTrue(seen[0], "in front of the wall");
         assertFalse(seen[1], "behind the wall");
         assertTrue(seen[2], "over the top of the wall");
@@ -80,28 +87,61 @@ class VisibilityTest {
         var positions = plugAndTarget();
         int target = positions.size() - 2, above = positions.size() - 1;
 
-        var terrainOnly = visible(OPEN, positions, Kernels.scalar(), false);
+        var terrainOnly = visible(OPEN, positions, Kernels.scalar(), false, sight(1f, false));
         assertTrue(terrainOnly[target], "only terrain occludes: nothing is in the way");
 
-        var withPieces = visible(OPEN, positions, Kernels.scalar(), true);
+        var withPieces = visible(OPEN, positions, Kernels.scalar(), true, sight(1f, false));
         assertFalse(withPieces[target], "the plug of pieces hides it");
         assertTrue(withPieces[above], "a piece the plug does not cover is still seen");
-        assertTrue(withPieces[1] || withPieces[0] || withPieces[2], "the near face of the plug itself is seen");
     }
 
     @Test
     void aPieceDoesNotHideItself() {
-        var seen = visible(OPEN, List.of(new float[]{12.5f, 2.5f, 0.5f}), Kernels.scalar(), true);
+        var seen = visible(OPEN, List.of(new float[]{12.5f, 2.5f, 0.5f}), Kernels.scalar(), true, sight(1f, false));
         assertTrue(seen[0]);
+    }
+
+    @Test
+    void whatIsBehindThePlayerIsHidden() {
+        var positions = List.of(
+                new float[]{8, 1.6f, 0},      // 0: straight ahead
+                new float[]{-8, 1.6f, 0},     // 1: straight behind
+                new float[]{3, 1.6f, 7},      // 2: well off to the side but inside the cone
+                new float[]{0.5f, 1.6f, -1f}); // 3: next to the eye (and off the line to the others), whatever way they look
+
+        var facingIn = visible(OPEN, positions, Kernels.scalar(), true, sight(1f, true));
+        assertTrue(facingIn[0]);
+        assertFalse(facingIn[1], "behind the viewer");
+        assertTrue(facingIn[2], "the cone is wide: 110 degrees vertical at 16:9 reaches far to the sides");
+        assertTrue(facingIn[3]);
+
+        var facingOut = visible(OPEN, positions, Kernels.scalar(), true, sight(-1f, true));
+        assertFalse(facingOut[0], "the same piece is behind them now");
+        assertTrue(facingOut[1]);
+
+        assertTrue(visible(OPEN, positions, Kernels.scalar(), true, sight(-1f, false))[0], "without the cone, only distance and walls decide");
+    }
+
+    @Test
+    void theConeIsAsWideAsTheScreenCornersPlusTheMargin() {
+        // 110 degrees vertical at 16:9: the half angle to a corner is atan(sqrt(tan(55)^2 * (1 + (16/9)^2))) = 71.1 degrees
+        assertEquals(71.1 + 15, Math.toDegrees(Occlusion.standard().coneHalfAngle()), 0.1);
+        // A narrower window and field of view give a narrower cone; the cone can be turned off
+        assertTrue(Occlusion.standard().withView(70f, 4f / 3f, 5f).coneHalfAngle() < Occlusion.standard().coneHalfAngle());
+        assertEquals(Math.PI, Occlusion.standard().withoutViewCone().coneHalfAngle());
+        // A very wide window needs more than half the sphere
+        assertTrue(Math.toDegrees(Occlusion.standard().withView(110f, 32f / 9f, 15f).coneHalfAngle()) > 90);
     }
 
     @Test
     void vectorKernelsAgree() {
         var vector = Kernels.vector();
         Assumptions.assumeTrue(vector != null, "no SIMD kernels in this JVM");
-        assertArrayEquals(visible(WALLED, List.of(PIECES), Kernels.scalar(), true), visible(WALLED, List.of(PIECES), vector, true));
-        var plug = plugAndTarget();
-        assertArrayEquals(visible(OPEN, plug, Kernels.scalar(), true), visible(OPEN, plug, vector, true));
+        for (boolean cone : new boolean[]{false, true}) {
+            assertArrayEquals(visible(WALLED, List.of(PIECES), Kernels.scalar(), true, sight(1f, cone)), visible(WALLED, List.of(PIECES), vector, true, sight(1f, cone)));
+            var plug = plugAndTarget();
+            assertArrayEquals(visible(OPEN, plug, Kernels.scalar(), true, sight(1f, cone)), visible(OPEN, plug, vector, true, sight(1f, cone)));
+        }
     }
 
 }

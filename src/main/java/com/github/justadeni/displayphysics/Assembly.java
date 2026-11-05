@@ -36,9 +36,8 @@ public final class Assembly {
 
     private static final long TICK_NANOS = 50_000_000L;
     private static final int VIEWER_REFRESH_TICKS = 20;
-    /** Floats per pose: qx qy qz qw tx ty tz + 1 padding, so two poses fill a 64-byte cache line and none straddles two. */
-    private static final int POSE_STRIDE = 8;
-    private static final int POSE_VALUES = 7;
+    /** Floats per pose, see {@link PoseFeed}. */
+    private static final int POSE_STRIDE = PoseFeed.STRIDE;
     private static final float VIEW_RANGE = 3f;
     /** Roughly where a standing player's eyes are above their feet. */
     private static final double EYE_HEIGHT = 1.62;
@@ -59,10 +58,11 @@ public final class Assembly {
     /** A player the displays are shown to. */
     private static final class Watcher {
         volatile double eyeX, eyeY, eyeZ;
+        /** The unit vector they look along. */
+        volatile float lookX, lookY = 0f, lookZ = 1f;
         volatile boolean located;
-        /** With occlusion on: the pose this player was last sent for each piece, and which pieces they can see. */
-        float[] sent;
-        boolean[] visible;
+        /** With occlusion on: what this player has been sent, and which pieces they can see. */
+        PoseFeed feed;
     }
 
     private final Map<Player, Watcher> shown = new ConcurrentHashMap<>();
@@ -72,8 +72,11 @@ public final class Assembly {
     private final AtomicBoolean released = new AtomicBoolean();
     private final double centerX, centerY, centerZ;
 
-    /** The pose each display was last sent, {@code qx qy qz qw tx ty tz}; guarded by {@code this}. */
-    private final float[] sent;
+    /** What everyone has been sent when nothing is culled; guarded by {@code this}. */
+    private final PoseFeed shared;
+    /** The newest pose of every piece, when culling means there is no single "what everyone has". */
+    private final float[] latest;
+    private final int[] selection;
     private boolean anySent;
 
     Assembly(Logger logger, Platform platform, World world, List<Piece> pieces, Viewers viewers) {
@@ -83,9 +86,12 @@ public final class Assembly {
         this.pieces = List.copyOf(pieces);
         this.viewers = viewers;
         this.count = this.pieces.size();
-        this.sent = new float[count * POSE_STRIDE];
+        var identity = new float[count * POSE_STRIDE];
         for (int i = 0; i < count; i++)
-            sent[i * POSE_STRIDE + 3] = 1f;
+            identity[i * POSE_STRIDE + 3] = 1f;
+        this.shared = new PoseFeed(identity, count, false);
+        this.latest = identity.clone();
+        this.selection = new int[count];
 
         ids = new int[count];
         spawnPlain = new Object[count][];
@@ -268,25 +274,14 @@ public final class Assembly {
             publishCulled(pose, ticks, last);
             return;
         }
-        List<Object> packets = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            int o = i * POSE_STRIDE;
-            // Pieces at rest keep their pose: sending it again would only restart their interpolation
-            boolean same = true;
-            for (int k = o; k < o + POSE_VALUES; k++)
-                if (pose[k] != sent[k]) {
-                    same = false;
-                    break;
-                }
-            if (same)
-                continue;
-            System.arraycopy(pose, o, sent, o, POSE_STRIDE);
-            packets.add(posePacket(sent, i, ticks));
-        }
+        int picked = shared.select(pose, last, selection);
         anySent = true;
-        if (packets.isEmpty() || released.get())
+        if (picked == 0 || released.get())
             return;
 
+        List<Object> packets = new ArrayList<>(picked);
+        for (int k = 0; k < picked; k++)
+            packets.add(posePacket(pose, selection[k], ticks));
         Object bundle = Packets.bundle(packets);
         for (Player player : shown.keySet())
             Packets.send(player, bundle);
@@ -295,34 +290,25 @@ public final class Assembly {
     private void publishCulled(float[] pose, int ticks, boolean last) {
         if (frameCache.length < count)
             frameCache = new Object[count];
-        System.arraycopy(pose, 0, sent, 0, count * POSE_STRIDE); // the latest pose of everything, for whoever arrives next
+        System.arraycopy(pose, 0, latest, 0, count * POSE_STRIDE); // for whoever arrives next
         anySent = true;
         if (released.get())
             return;
 
         for (Map.Entry<Player, Watcher> entry : shown.entrySet()) {
-            Watcher watcher = entry.getValue();
-            if (watcher.sent == null)
+            PoseFeed feed = entry.getValue().feed;
+            if (feed == null)
                 continue;
-            List<Object> packets = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                if (!last && !watcher.visible[i])
-                    continue;
-                int o = i * POSE_STRIDE;
-                boolean same = true;
-                for (int k = o; k < o + POSE_VALUES; k++)
-                    if (pose[k] != watcher.sent[k]) {
-                        same = false;
-                        break;
-                    }
-                if (same)
-                    continue;
-                System.arraycopy(pose, o, watcher.sent, o, POSE_STRIDE);
+            int picked = feed.select(pose, last, selection);
+            if (picked == 0)
+                continue;
+            List<Object> packets = new ArrayList<>(picked);
+            for (int k = 0; k < picked; k++) {
+                int piece = selection[k];
                 // One packet per piece per frame, shared by everyone who gets it
-                packets.add(frameCache[i] != null ? frameCache[i] : (frameCache[i] = posePacket(pose, i, ticks)));
+                packets.add(frameCache[piece] != null ? frameCache[piece] : (frameCache[piece] = posePacket(pose, piece, ticks)));
             }
-            if (!packets.isEmpty())
-                Packets.send(entry.getKey(), Packets.bundle(packets));
+            Packets.send(entry.getKey(), Packets.bundle(packets));
         }
         java.util.Arrays.fill(frameCache, 0, count, null);
     }
@@ -333,27 +319,28 @@ public final class Assembly {
                 new Quaternionf(source[o], source[o + 1], source[o + 2], source[o + 3]));
     }
 
+    /** The newest pose of every piece. */
+    private float[] newest() {
+        return occlusion != null ? latest : shared.sent();
+    }
+
     // ── Occlusion ────────────────────────────────────────────────────────────
 
     /** Starts per-player bookkeeping for everyone already watching. */
     private synchronized void enableOcclusion(Occlusion occlusion) {
         this.occlusion = occlusion;
-        if (occlusion != null)
+        if (occlusion != null) {
+            System.arraycopy(shared.sent(), 0, latest, 0, latest.length);
             for (Watcher watcher : shown.values())
-                prepare(watcher);
-    }
-
-    private void prepare(Watcher watcher) {
-        watcher.sent = sent.clone();
-        watcher.visible = new boolean[count];
-        java.util.Arrays.fill(watcher.visible, true);
+                watcher.feed = new PoseFeed(latest, count, true);
+        }
     }
 
     /** Recomputes which pieces each player can see from where they stand. */
     private void updateVisibility(Simulator sim, Occlusion occlusion) {
         for (Watcher watcher : shown.values())
-            if (watcher.located && watcher.visible != null)
-                sim.visibility(watcher.eyeX, watcher.eyeY, watcher.eyeZ, occlusion.maxDistance(), occlusion.spacing(), occlusion.pieces(), watcher.visible);
+            if (watcher.located && watcher.feed != null)
+                sim.visibility(occlusion, watcher.eyeX, watcher.eyeY, watcher.eyeZ, watcher.lookX, watcher.lookY, watcher.lookZ, watcher.feed.visible());
     }
 
     // ── Viewers ──────────────────────────────────────────────────────────────
@@ -418,12 +405,16 @@ public final class Assembly {
             watcher.eyeX = at.getX();
             watcher.eyeY = at.getY() + EYE_HEIGHT;
             watcher.eyeZ = at.getZ();
+            double yaw = Math.toRadians(at.getYaw()), pitch = Math.toRadians(at.getPitch());
+            watcher.lookX = (float) (-Math.sin(yaw) * Math.cos(pitch));
+            watcher.lookY = (float) -Math.sin(pitch);
+            watcher.lookZ = (float) (Math.cos(yaw) * Math.cos(pitch));
             watcher.located = true;
             if (!arriving)
                 continue;
 
             if (occlusion != null)
-                prepare(watcher);
+                watcher.feed = new PoseFeed(latest, count, true);
             shown.put(player, watcher);
             boolean glow = anyGlow && viewers.seesGlow(player);
             List<Object> packets = new ArrayList<>(count * 3);
@@ -432,7 +423,7 @@ public final class Assembly {
             // Someone arriving mid-fall sees the pieces where they are now
             if (anySent)
                 for (int i = 0; i < count; i++)
-                    packets.add(posePacket(sent, i, 0));
+                    packets.add(posePacket(newest(), i, 0));
             Packets.send(player, Packets.bundle(packets));
         }
     }

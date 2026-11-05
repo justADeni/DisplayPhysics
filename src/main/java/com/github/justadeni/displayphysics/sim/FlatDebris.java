@@ -123,12 +123,12 @@ public final class FlatDebris {
      * Pieces that came to rest are reported visible: they no longer change, and a viewer that has not seen
      * their last move needs it.
      */
-    public void visibility(float ex, float ey, float ez, float maxDistance, float spacing, boolean piecesOcclude, boolean[] visibleByPiece) {
+    public void visibility(Sight sight, boolean piecesOcclude, boolean[] visibleByPiece) {
         int awake = b.awake;
         if (visibleBySlot.length < awake)
             visibleBySlot = new boolean[b.capacity];
         if (awake > 0) {
-            kernels.visibility(b, 0, awake, grid, piecesOcclude ? occupancyOfMovingPieces(awake) : null, ex, ey, ez, maxDistance, spacing, visibleBySlot);
+            kernels.visibility(b, 0, awake, grid, piecesOcclude ? occupancyOfMovingPieces(awake) : null, sight, visibleBySlot);
         }
         for (int s = 0; s < awake; s++)
             visibleByPiece[b.id[s]] = visibleBySlot[s];

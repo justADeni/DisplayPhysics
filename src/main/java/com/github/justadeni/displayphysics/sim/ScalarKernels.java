@@ -242,9 +242,10 @@ public final class ScalarKernels implements Kernels {
     /** A piece never hides itself or its immediate neighbours: samples this close to the line's end ignore the pieces. */
     static final float SELF_CLEARANCE = 0.8f;
 
-    static void lineOfSight(Bodies b, int from, int to, Grid grid, byte[] occupancy, float ex, float ey, float ez,
-                           float maxDistance, float spacing, boolean[] out) {
-        float maxSquared = maxDistance * maxDistance;
+    static void lineOfSight(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
+        float ex = sight.ex(), ey = sight.ey(), ez = sight.ez(), spacing = sight.spacing();
+        float maxSquared = sight.maxDistance() * sight.maxDistance();
+        float nearSquared = Sight.NEAR * Sight.NEAR;
         byte[] cells = grid.cells;
         for (int i = from; i < to; i++) {
             float cx = b.px[i], cy = b.py[i], cz = b.pz[i];
@@ -254,8 +255,13 @@ public final class ScalarKernels implements Kernels {
                 out[i] = false;
                 continue;
             }
-            if (distanceSquared < 4f) {
+            if (distanceSquared < nearSquared) {
                 out[i] = true;
+                continue;
+            }
+            // Outside the cone the player could be looking through: not worth a single line
+            if (sight.cone() && !sight.inCone(dx, dy, dz, (float) Math.sqrt(distanceSquared))) {
+                out[i] = false;
                 continue;
             }
 

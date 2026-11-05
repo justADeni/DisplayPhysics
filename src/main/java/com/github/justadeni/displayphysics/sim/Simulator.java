@@ -3,6 +3,7 @@ package com.github.justadeni.displayphysics.sim;
 import com.github.justadeni.displayphysics.Blast;
 import com.github.justadeni.displayphysics.Hinge;
 import com.github.justadeni.displayphysics.Mode;
+import com.github.justadeni.displayphysics.Occlusion;
 import com.github.justadeni.displayphysics.Settings;
 import com.github.justadeni.displayphysics.TerrainSource;
 import org.joml.Matrix3f;
@@ -584,15 +585,18 @@ public final class Simulator {
     }
 
     /**
-     * Which pieces an eye at this world position can see (by piece). While the assembly is still one body there is
-     * nothing to cull, and everything is visible.
+     * Which pieces a viewer can see (by piece), looking along the unit vector {@code (lx, ly, lz)} from this world
+     * position. While the assembly is still one body there is nothing to cull, and everything is visible.
      */
-    public void visibility(double ex, double ey, double ez, float maxDistance, float spacing, boolean piecesOcclude, boolean[] visibleByPiece) {
+    public void visibility(Occlusion occlusion, double ex, double ey, double ez, float lx, float ly, float lz, boolean[] visibleByPiece) {
         if (debris == null) {
             java.util.Arrays.fill(visibleByPiece, 0, count, true);
             return;
         }
-        debris.visibility((float) (ex - ox), (float) (ey - oy), (float) (ez - oz), maxDistance, spacing, piecesOcclude, visibleByPiece);
+        double half = occlusion.coneHalfAngle();
+        var sight = new Sight((float) (ex - ox), (float) (ey - oy), (float) (ez - oz), lx, ly, lz,
+                half < Math.PI, (float) Math.cos(half), (float) Math.sin(half), occlusion.maxDistance(), occlusion.spacing());
+        debris.visibility(sight, occlusion.pieces(), visibleByPiece);
     }
 
     /** World position of the centre of piece {@code i}. */
