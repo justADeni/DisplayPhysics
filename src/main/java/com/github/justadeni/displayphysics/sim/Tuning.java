@@ -11,10 +11,10 @@ final class Tuning {
     /** One server tick, in seconds. */
     static final float TICK = 0.05f;
     static final long TICK_MS = 50;
-    /** A falling tree should float, so wood gets slightly more than its weight back in liquids. */
+    /** Pieces float in liquids: they get slightly more than their weight back. */
     static final float BUOYANCY = 1.25f;
     static final float LIQUID_DRAG = 2.5f;
-    /** Extra angular damping while touching something: branches dig in, so trees don't roll like balls. */
+    /** Extra angular damping while touching something: rough surfaces dig in, so assemblies don't roll like balls. */
     static final float ROLLING_RESISTANCE = 2.0f;
     /** Ticks a body must stay calm while touching something before it counts as settled. */
     static final int CALM_TICKS_TO_SLEEP = 10;

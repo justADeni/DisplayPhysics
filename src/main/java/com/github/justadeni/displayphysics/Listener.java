@@ -13,7 +13,7 @@ public interface Listener {
     /** The assembly hit something at least {@link Settings#impactReportSpeed} fast, at this world position. */
     default void onImpact(double x, double y, double z, float speed) {}
 
-    /** The assembly just broke into individual pieces. */
+    /** The assembly just broke into individual pieces (shattered, collapsed or was blown apart). */
     default void onBreak(Tick tick) {}
 
     /** Per-piece view of the current tick. */

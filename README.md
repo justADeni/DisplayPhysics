@@ -1,44 +1,81 @@
 # DisplayPhysics
 
-Rigid-body and debris physics for a group of blocks, shown as **packet-only block displays**.
+Physics for groups of blocks, shown as **packet-only block displays**: collapse, tumble, shatter or blow up.
 
-You describe the blocks, the ground and how it should start moving. The library moves the
-blocks as one solid unit, optionally breaks it into single blocks when it hits something too
-fast, sends every frame straight from its own thread (bundled, so all clients apply a frame
-together), and hands back where each block came to rest.
+You describe the blocks, the ground and how they should start moving. The library moves them as one
+solid body or as separate pieces, sends every frame straight from its own thread (bundled, so all
+clients apply a frame together), and hands back where each piece came to rest.
 
-Supports Spigot, Paper and Folia 26.1, 26.2, 26.3 and newer (servers using Mojang's class names). Only the Bukkit API is used; the sole server-internal access is building and sending the packets. `DisplayPhysics.isSupported()`
-tells you whether the current server can be used.
+Supports Spigot, Paper and Folia 26.1, 26.2, 26.3 and newer (servers using Mojang's class names). Only
+the Bukkit API is used; the sole server-internal access is building and sending the packets.
+`DisplayPhysics.isSupported()` tells you whether the current server can be used.
 
 ```java
 DisplayPhysics physics = DisplayPhysics.create(plugin);
 
-// 1. Spawns the displays for the viewers (nothing moves yet). Remove the real blocks a tick later.
+// 1. Spawns the displays for the viewers (nothing moves yet). Remove the real blocks once spawned() completes.
 Assembly assembly = physics.assemble(world, pieces, Viewers.nearby());
 
-// 2. Let it fall. Runs on its own virtual thread.
-assembly.simulate(hinge, new Settings().breakMode(BreakMode.BREAK_ON_IMPACT).breakSpeed(6f), terrain, listener)
-        .thenAccept(result -> {
-            for (int i = 0; i < result.count(); i++) {
-                // result.x(i), y(i), z(i), rotation(i): where piece i settled
-            }
-            // 3. Spawn items / place blocks there, then remove the displays.
-            assembly.release();
-        });
+// 2. Let it go. Runs on its own virtual thread.
+var settings = new Settings().mode(Mode.explode(Blast.at(x, y, z, 4f)));
+assembly.simulate(null, settings, terrain, listener).thenAccept(result -> {
+    for (int i = 0; i < result.count(); i++) {
+        // result.x(i), y(i), z(i), rotation(i) or block(i): where piece i settled
+    }
+    // 3. Spawn items / place blocks there, then remove the displays.
+    assembly.release();
+});
 ```
+
+## Modes
+
+| `Mode` | Behaviour |
+|--------|-----------|
+| `Mode.RIGID` | one solid body that falls, bounces, slides and rolls until it rests |
+| `Mode.breakOnImpact(speed)` | solid until it hits something faster than `speed`, then every piece scatters |
+| `Mode.FALL_APART` | no solid stage: separate pieces from the first tick that simply collapse |
+| `Mode.explode(blast)` | pieces are thrown apart by a `Blast` |
+
+A `Hinge` gives the solid modes a start like a door swinging open: tip over an edge, then let go.
+
+### Explosions
+
+```java
+Blast.everything()                                   // every piece, away from the assembly's centre
+Blast.at(x, y, z, 4f)                                // only pieces within 4 blocks of a point
+Blast.at(location, 4f)                               // same, from a Location
+Blast.at(XYZ.pack(x, y, z), 4f)                      // same, from a packed block position
+
+    .force(18f)                                      // launch speed (blocks/s) at the epicenter, fading towards the edge
+    .lift(0.3f)                                      // extra upward speed, as a fraction of the launch speed
+    .aim(Blast.Aim.cone(0, 0, 1, spread))            // all along one direction, scattered within `spread` radians
+    .aim(Blast.Aim.OUTWARD)                          // (default) straight away from the epicenter
+    .remainder(Blast.Remainder.FALL)                 // pieces out of reach drop; STAY (default) keeps them as solid ground
+```
+
+An aimed blast with a small radius behaves like a projectile hitting a wall: the pieces around the
+impact fly forwards in a fan, the rest of the wall stays.
+
+## Types
 
 | Type | Role |
 |------|------|
-| `Piece` | one block: position, `BlockData`, hard (logs) or soft (leaves), mass, glow colour |
-| `Hinge` | optional start: tip over an edge like a felled tree, then let go |
+| `Piece` | one block: position, `BlockData`, hard or soft, mass, glow colour |
+| `Mode`, `Blast` | what happens to the pieces |
+| `Hinge` | optional start for the solid modes |
 | `TerrainSource` | thread-safe view of the ground; the library never reads the live world |
-| `Settings` / `BreakMode` | gravity, friction, bounciness, `RIGID` or `BREAK_ON_IMPACT` with `breakSpeed` |
+| `Settings` | gravity, friction, bounciness, mode, ... |
 | `Listener` | per-tick hook for your own sounds, particles and damage |
 | `Result` | resting position and rotation of every piece |
-| `Viewers` | who sees the displays; newcomers get them mid-fall |
+| `Viewers` | who sees the displays; newcomers get them mid-flight |
+| `XYZ` | packs a block position into one `long` (27 bits x, 9 bits y, 27 bits z) |
 
-Threading: the simulation never touches the world, chunks or entities. The only entity it reads is a player's location, through a `Platform` (plain Bukkit, or Paper/Folia's entity scheduler, which is only loaded where that API exists), so it is safe on Folia. Wait for `assembly.spawned()` before removing the real blocks. Displays that
-nobody releases are removed automatically after the simulation (`Settings.autoReleaseSeconds`).
+Positions are primitives first (`x, y, z` or one packed `long`); every method that takes them has a
+`Location` overload that defers to the primitive one, so nothing allocates on the hot path.
 
-The physics (`sim` package) has no Bukkit dependency and is covered by headless tests:
-`./gradlew test`.
+Threading: the simulation never touches the world, chunks or entities. The only entity it reads is a
+player's location, through a `Platform` (plain Bukkit, or Paper/Folia's entity scheduler, which is only
+loaded where that API exists), so it is safe on Folia. Wait for `assembly.spawned()` before removing
+the real blocks.
+
+The physics (`sim` package) has no Bukkit dependency and is covered by headless tests: `./gradlew test`.

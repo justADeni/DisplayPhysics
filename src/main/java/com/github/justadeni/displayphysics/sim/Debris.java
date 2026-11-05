@@ -9,7 +9,7 @@ import java.util.Arrays;
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
 
 /**
- * The blocks of a tree that fell apart: one small rigid body per block, colliding
+ * The pieces of an assembly that fell apart: one small rigid body per block, colliding
  * with the terrain (8 cube corners each) and with each other.
  *
  * <p>Block-to-block contacts treat each block as a sphere of radius 0.5, so blocks
@@ -34,7 +34,7 @@ final class Debris {
     private final boolean[] touching;
     private final int[] calm;
     private final Voxels terrain;
-    private final float gravity, friction, bounciness, leafBounciness;
+    private final float gravity, friction, bounciness, softBounciness;
 
     private final ContactSolver solver = new ContactSolver();
 
@@ -53,14 +53,14 @@ final class Debris {
     private int pairCount;
     private final Matrix3f rot = new Matrix3f();
 
-    Debris(Voxels terrain, Body[] pieces, boolean[] hard, float gravity, float friction, float bounciness, float leafBounciness) {
+    Debris(Voxels terrain, Body[] pieces, boolean[] hard, float gravity, float friction, float bounciness, float softBounciness) {
         this.terrain = terrain;
         this.pieces = pieces;
         this.hard = hard;
         this.gravity = gravity;
         this.friction = friction;
         this.bounciness = bounciness;
-        this.leafBounciness = leafBounciness;
+        this.softBounciness = softBounciness;
         this.count = pieces.length;
         this.asleep = new boolean[count];
         this.touching = new boolean[count];
@@ -98,7 +98,7 @@ final class Debris {
                     p.w.mul(1f - LIQUID_DRAG * dt);
                     touching[i] = true;
                 }
-                // Leaves catch the air
+                // Soft pieces catch the air
                 float drag = hard[i] ? 0.05f : 1.0f;
                 p.v.mul(1f - drag * dt);
                 p.w.mul(1f - (touching[i] ? ROLLING_RESISTANCE : 0.2f) * dt);
@@ -129,7 +129,7 @@ final class Debris {
                             sa * az + sb * bz + sc * cz,
                             hard[i]);
                 }
-                solver.solve(p, dt, ITERATIONS, friction, bounciness, leafBounciness);
+                solver.solve(p, dt, ITERATIONS, friction, bounciness, softBounciness);
                 if (solver.count() > 0)
                     touching[i] = true;
             }
@@ -272,8 +272,8 @@ final class Debris {
         if (wa + wb == 0f)
             return;
 
-        // Bouncy leaves spring off whatever they hit; otherwise blocks barely rebound off each other
-        float restitution = (!hard[i] || !hard[j]) ? Math.max(RESTITUTION, leafBounciness) : RESTITUTION;
+        // Bouncy soft pieces spring off whatever they hit; otherwise blocks barely rebound off each other
+        float restitution = (!hard[i] || !hard[j]) ? Math.max(RESTITUTION, softBounciness) : RESTITUTION;
         float jn = -(1f + restitution) * vn / (wa + wb);
         a.v.sub(nx * jn * wa, ny * jn * wa, nz * jn * wa);
         b.v.add(nx * jn * wb, ny * jn * wb, nz * jn * wb);

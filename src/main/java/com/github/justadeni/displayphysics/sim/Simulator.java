@@ -1,7 +1,8 @@
 package com.github.justadeni.displayphysics.sim;
 
-import com.github.justadeni.displayphysics.BreakMode;
+import com.github.justadeni.displayphysics.Blast;
 import com.github.justadeni.displayphysics.Hinge;
+import com.github.justadeni.displayphysics.Mode;
 import com.github.justadeni.displayphysics.Settings;
 import com.github.justadeni.displayphysics.TerrainSource;
 import org.joml.Matrix3f;
@@ -27,7 +28,7 @@ import static com.github.justadeni.displayphysics.sim.Tuning.*;
  *       the release angle or hits something.</li>
  *   <li><b>Rigid</b> - the whole assembly is one rigid body that falls, bounces, slides and rolls
  *       against the terrain.</li>
- *   <li><b>Debris</b> ({@link BreakMode#BREAK_ON_IMPACT} only) - after a hard impact every block
+ *   <li><b>Debris</b> ({@link Mode.BreakOnImpact}, {@link Mode.FallApart} and {@link Mode.Explode}) - every block
  *       becomes its own body, colliding with the terrain and with each other.</li>
  * </ol>
  *
@@ -82,6 +83,8 @@ public final class Simulator {
     private int freeTicks = 0;
     private int splitAt = -1;
     private final int maxTicks, maxRigidTicks;
+    /** The shatter-on-impact rules, or {@code null} for the other modes. */
+    private final Mode.BreakOnImpact breakOn;
 
     // This tick's events
     private float impact;
@@ -145,27 +148,40 @@ public final class Simulator {
             terrainRefresh = source.refresh();
 
         maxTicks = Math.max(20, (int) (settings.maxDuration * 20f));
-        maxRigidTicks = Math.max(1, (int) (settings.maxRigidSeconds * 20f));
+        breakOn = settings.mode instanceof Mode.BreakOnImpact b ? b : null;
+        maxRigidTicks = breakOn == null ? 0 : Math.max(1, (int) (breakOn.maxRigidSeconds() * 20f));
 
         buildRigidBody();
 
-        if (settings.breakMode == BreakMode.FALL_APART) {
-            // No solid stage: the blocks are separate bodies from the start
-            splitIntoDebris(0.2f);
-            pendingBreak = true;
-        } else if (hinge != null) {
-            hingeAxis.set(hinge.axis());
-            hingeAxis.y = 0;
-            if (hingeAxis.lengthSquared() < 1e-6f)
-                hingeAxis.set(1, 0, 0);
-            hingeAxis.normalize();
-            hingePivot.set((float) (hinge.pivotX() - ox), (float) (hinge.pivotY() - oy), (float) (hinge.pivotZ() - oz));
-            hingeArm.set(com0).sub(hingePivot);
-            theta = hinge.initialAngle();
-            phase = Phase.HINGE;
-        } else {
-            phase = Phase.RIGID;
+        switch (settings.mode) {
+            // No solid stage: the pieces are separate bodies from the first tick
+            case Mode.FallApart _ -> {
+                shatter(false, scatter(0.2f));
+                pendingBreak = true;
+            }
+            case Mode.Explode explode -> {
+                explode(explode.blast());
+                pendingBreak = true;
+            }
+            case Mode.Rigid _, Mode.BreakOnImpact _ -> startSolid();
         }
+    }
+
+    /** Starts as one body, tipping over the hinge first if there is one. */
+    private void startSolid() {
+        if (hinge == null) {
+            phase = Phase.RIGID;
+            return;
+        }
+        hingeAxis.set(hinge.axis());
+        hingeAxis.y = 0;
+        if (hingeAxis.lengthSquared() < 1e-6f)
+            hingeAxis.set(1, 0, 0);
+        hingeAxis.normalize();
+        hingePivot.set((float) (hinge.pivotX() - ox), (float) (hinge.pivotY() - oy), (float) (hinge.pivotZ() - oz));
+        hingeArm.set(com0).sub(hingePivot);
+        theta = hinge.initialAngle();
+        phase = Phase.HINGE;
     }
 
     // ── Setup ────────────────────────────────────────────────────────────────
@@ -197,7 +213,7 @@ public final class Simulator {
         body.updateInertia();
 
         // Collision probes: every corner of every hard piece, plus the centre of each
-        // exposed soft piece (soft pieces sink in half a block, like a squashed canopy).
+        // exposed soft piece (soft pieces sink in half a block, like a cushion).
         Set<Long> occupied = new HashSet<>(count * 2);
         for (int i = 0; i < count; i++)
             occupied.add(key(Math.round(offX[i]), Math.round(offY[i]), Math.round(offZ[i])));
@@ -327,11 +343,11 @@ public final class Simulator {
         impact = stepRigid();
         boolean settled = updateRigidCalm();
 
-        if (settings.breakMode == BreakMode.BREAK_ON_IMPACT) {
-            if (splitAt < 0 && (impact >= settings.breakSpeed || freeTicks >= maxRigidTicks || settled))
-                splitAt = tick + (settled ? 0 : settings.breakDelay);
+        if (breakOn != null) {
+            if (splitAt < 0 && (impact >= breakOn.speed() || freeTicks >= maxRigidTicks || settled))
+                splitAt = tick + (settled ? 0 : breakOn.delayTicks());
             if (splitAt >= 0 && tick >= splitAt)
-                splitIntoDebris(1f);
+                shatter(false, scatter(1f));
         } else if (settled) {
             phase = Phase.DONE;
         }
@@ -351,7 +367,7 @@ public final class Simulator {
                 body.w.mul(1f - LIQUID_DRAG * dt);
             }
             body.v.mul(1f - 0.02f * dt);
-            // Branches dig in, so an assembly touching the ground resists rolling
+            // Rough surfaces dig in, so an assembly touching the ground resists rolling
             body.w.mul(1f - (rigidContacts > 0 ? ROLLING_RESISTANCE : 0.1f) * dt);
 
             solver.begin();
@@ -381,14 +397,29 @@ public final class Simulator {
 
     // ── Debris phase ─────────────────────────────────────────────────────────
 
-    private void splitIntoDebris(float scatterScale) {
-        Body[] pieces = new Body[count];
+    /**
+     * Gives a piece its launch velocity.
+     *
+     * @param fromCentre the piece's offset from the body's centre of mass
+     * @return whether the piece was thrown
+     */
+    @FunctionalInterface
+    private interface Kick {
+        boolean apply(int piece, Body body, Vector3f fromCentre);
+    }
 
-        float scatter = settings.scatter * scatterScale;
-        Vector3f out = new Vector3f();
+    /**
+     * Turns every piece into its own body, carrying the velocity of the whole at its position plus
+     * whatever {@code kick} adds.
+     *
+     * @param sleepUnthrown whether pieces the kick left alone start asleep, as solid ground for the others
+     */
+    private void shatter(boolean sleepUnthrown, Kick kick) {
+        var pieces = new Body[count];
+        var thrown = new boolean[count];
 
         for (int i = 0; i < count; i++) {
-            Body piece = new Body();
+            var piece = new Body();
             body.q.transform(offX[i] + 0.5f - com0.x, offY[i] + 0.5f - com0.y, offZ[i] + 0.5f - com0.z, r);
 
             piece.x.set(body.x).add(r);
@@ -396,28 +427,103 @@ public final class Simulator {
             body.velocityAt(r, piece.v);
             piece.w.set(body.w);
 
-            // Burst outward from the middle and a little upward
-            out.set(r.x, 0, r.z);
-            if (out.lengthSquared() < 1e-4f)
-                out.set((float) random.nextDouble(-1, 1), 0, (float) random.nextDouble(-1, 1));
-            out.normalize();
-            float strength = scatter * (float) random.nextDouble(0.4, 1.0) * (hard[i] ? 1f : 1.5f);
-            piece.v.add(out.x * 0.7f * strength, 0.5f * strength, out.z * 0.7f * strength);
-            piece.v.add((float) random.nextDouble(-0.3, 0.3) * strength,
-                    (float) random.nextDouble(-0.3, 0.3) * strength,
-                    (float) random.nextDouble(-0.3, 0.3) * strength);
-            piece.w.add((float) random.nextDouble(-1.5, 1.5) * scatter,
-                    (float) random.nextDouble(-1.5, 1.5) * scatter,
-                    (float) random.nextDouble(-1.5, 1.5) * scatter);
-
+            thrown[i] = kick.apply(i, piece, r);
             Debris.makeCube(piece, mass[i]);
             pieces[i] = piece;
         }
 
         debris = new Debris(terrain, pieces, hard, settings.gravity, settings.friction, settings.bounciness, settings.softBounciness);
+        if (sleepUnthrown)
+            for (int i = 0; i < count; i++)
+                debris.asleep[i] = !thrown[i];
         phase = Phase.DEBRIS;
         brokeNow = true;
         pendingBreak = false;
+    }
+
+    /** Bursts pieces outward from the middle and a little upward, with some tumble. */
+    private Kick scatter(float scale) {
+        float scatter = settings.scatter * scale;
+        var out = new Vector3f();
+        return (i, piece, fromCentre) -> {
+            out.set(fromCentre.x, 0, fromCentre.z);
+            if (out.lengthSquared() < 1e-4f)
+                randomHorizontal(out);
+            out.normalize();
+            float strength = scatter * (float) random.nextDouble(0.4, 1.0) * (hard[i] ? 1f : 1.5f);
+            piece.v.add(out.x * 0.7f * strength, 0.5f * strength, out.z * 0.7f * strength);
+            piece.v.add(jitter(0.3f * strength), jitter(0.3f * strength), jitter(0.3f * strength));
+            piece.w.add(jitter(1.5f * scatter), jitter(1.5f * scatter), jitter(1.5f * scatter));
+            return true;
+        };
+    }
+
+    /** Throws the pieces the blast reaches: faster near its centre, in the direction its aim says. */
+    private void explode(Blast blast) {
+        var centre = switch (blast.epicenter()) {
+            case Blast.Epicenter.Point(double x, double y, double z) -> new Vector3f((float) (x - ox), (float) (y - oy), (float) (z - oz));
+            case Blast.Epicenter.Centre _ -> new Vector3f(com0);
+        };
+        float radius = blast.radius();
+        float radiusSquared = radius * radius;
+        boolean bounded = Float.isFinite(radius);
+        var offset = new Vector3f();
+        var direction = new Vector3f();
+
+        shatter(blast.remainder() == Blast.Remainder.STAY, (i, piece, _) -> {
+            offset.set(piece.x).sub(centre);
+            float distanceSquared = offset.lengthSquared();
+            if (bounded && distanceSquared > radiusSquared)
+                return false;
+
+            float falloff = bounded ? 1f - 0.5f * (float) Math.sqrt(distanceSquared) / radius : 1f;
+            float speed = blast.force() * falloff * (float) random.nextDouble(0.6, 1.0) * (hard[i] ? 1f : 1.3f);
+            aim(blast.aim(), offset, direction);
+            piece.v.set(direction).mul(speed).add(0, blast.lift() * speed, 0);
+            piece.w.set(jitter(0.3f * speed), jitter(0.3f * speed), jitter(0.3f * speed));
+            return true;
+        });
+    }
+
+    /** The unit direction a piece at {@code offset} from the epicenter is thrown in. */
+    private void aim(Blast.Aim aim, Vector3f offset, Vector3f out) {
+        switch (aim) {
+            case Blast.Aim.Outward _ -> {
+                out.set(offset);
+                if (out.lengthSquared() < 1e-6f)
+                    randomDirection(out);
+                out.normalize();
+            }
+            case Blast.Aim.Along(float x, float y, float z, float spread) -> {
+                // Uniform over the cone's solid angle: pick the angle from the axis through its cosine
+                float cosine = 1f - (float) random.nextDouble() * (1f - (float) Math.cos(spread));
+                float sine = (float) Math.sqrt(1f - cosine * cosine);
+                double azimuth = random.nextDouble(0, 2 * Math.PI);
+
+                var axis = new Vector3f(x, y, z);
+                var u = (Math.abs(x) < 0.9f ? new Vector3f(1, 0, 0) : new Vector3f(0, 1, 0)).cross(axis).normalize();
+                var v = new Vector3f(axis).cross(u);
+                out.set(axis).mul(cosine)
+                        .add(u.mul(sine * (float) Math.cos(azimuth)))
+                        .add(v.mul(sine * (float) Math.sin(azimuth)));
+            }
+        }
+    }
+
+    private float jitter(float amplitude) {
+        return (float) random.nextDouble(-amplitude, amplitude);
+    }
+
+    private void randomHorizontal(Vector3f out) {
+        out.set(jitter(1f), 0, jitter(1f));
+        if (out.lengthSquared() < 1e-6f)
+            out.set(1, 0, 0);
+    }
+
+    private void randomDirection(Vector3f out) {
+        out.set(jitter(1f), jitter(1f), jitter(1f));
+        if (out.lengthSquared() < 1e-6f)
+            out.set(0, 1, 0);
     }
 
     // ── Reading the state ────────────────────────────────────────────────────

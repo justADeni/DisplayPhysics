@@ -217,7 +217,7 @@ public final class Assembly {
                 }
             }
         } catch (Throwable e) {
-            // Never leave a tree hanging in the air: hand over whatever state was reached
+            // Never leave pieces hanging in the air: hand over whatever state was reached
             error = e;
             logger.log(Level.WARNING, "Simulation failed, using the state it reached", e);
         }

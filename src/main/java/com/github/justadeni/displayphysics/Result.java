@@ -39,6 +39,11 @@ public final class Result {
         return positions[piece * 3 + 2];
     }
 
+    /** The block containing the piece's centre, packed with {@link XYZ#pack}. */
+    public long block(int piece) {
+        return XYZ.pack((int) Math.floor(x(piece)), (int) Math.floor(y(piece)), (int) Math.floor(z(piece)));
+    }
+
     /** The piece's orientation: rotate a direction it started with by this to get where it points now. */
     public Quaternionf rotation(int piece) {
         int o = piece * 4;

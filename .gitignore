@@ -4,10 +4,3 @@ build/
 *.iml
 out/
 .kotlin/
-e2e/node_modules/
-e2e/servers/
-e2e/results/
-e2e/jars/
-e2e/*.tgz
-e2e/bt/
-e2e/idiff.json

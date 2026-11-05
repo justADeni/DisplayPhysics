@@ -1,6 +1,7 @@
 package com.github.justadeni.displayphysics.sim;
 
 import com.github.justadeni.displayphysics.TerrainSource;
+import com.github.justadeni.displayphysics.XYZ;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import org.joml.Vector3f;
 
@@ -46,13 +47,19 @@ final class Voxels {
     /** Voxel type at a cell given relative to the origin. */
     byte type(int rx, int ry, int rz) {
         int x = rx + ox, y = ry + oy, z = rz + oz;
-        long key = ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | (y & 0xFFF);
+        // Outside the world's height nothing needs looking up
+        if (y < minY)
+            return SOLID;
+        if (y >= maxY)
+            return AIR;
+
+        long key = XYZ.pack(x, y, z);
         if (key == lastKey)
             return lastType;
 
         byte type = cache.get(key);
         if (type == UNKNOWN) {
-            type = y < minY ? SOLID : (y >= maxY ? AIR : source.classify(x, y, z));
+            type = source.classify(x, y, z);
             cache.put(key, type);
         }
         lastKey = key;
@@ -81,7 +88,7 @@ final class Voxels {
      *
      * <p>Only faces whose neighbour is open and that the point could have come in
      * through (it isn't already moving out through them) count. Without the second
-     * rule, a branch rising into a thick canopy (only the top face open) would be
+     * rule, a protrusion rising into a thick slab (only the top face open) would be
      * pushed up through it block after block and launch the whole assembly.
      *
      * @param velX velocity of the point, used to tell the entry face from the exit face

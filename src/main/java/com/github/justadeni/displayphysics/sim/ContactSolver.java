@@ -76,10 +76,10 @@ final class ContactSolver {
     }
 
     /**
-     * @param restitution     bounciness of log contacts
-     * @param leafRestitution bounciness of leaf contacts (0 = leaves cushion)
+     * @param restitution     bounciness of hard contacts
+     * @param softRestitution bounciness of soft contacts (0 = soft pieces cushion)
      */
-    void solve(Body body, float dt, int iterations, float friction, float restitution, float leafRestitution) {
+    void solve(Body body, float dt, int iterations, float friction, float restitution, float softRestitution) {
         if (n == 0)
             return;
 
@@ -101,7 +101,7 @@ final class ContactSolver {
             kn[i] = 1f / body.inverseEffectiveMass(r, nrm);
 
             float vn = body.velocityAt(r, vel).dot(nrm);
-            bounce[i] = vn < -BOUNCE_THRESHOLD ? -(hard[i] ? restitution : leafRestitution) * vn : 0f;
+            bounce[i] = vn < -BOUNCE_THRESHOLD ? -(hard[i] ? restitution : softRestitution) * vn : 0f;
             if (-vn > maxImpact) {
                 maxImpact = -vn;
                 impactPoint.set(body.x).add(r);

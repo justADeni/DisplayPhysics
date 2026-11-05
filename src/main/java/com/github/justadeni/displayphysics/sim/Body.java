@@ -71,7 +71,7 @@ final class Body {
         return invMass + scratch2.dot(d);
     }
 
-    /** Nothing in a falling tree should ever move faster than this; a hard stop for solver blow-ups. */
+    /** Nothing simulated should ever move faster than this; a hard stop for solver blow-ups. */
     private static final float MAX_SPEED = 40f, MAX_SPIN = 25f;
 
     void integrate(float dt) {
