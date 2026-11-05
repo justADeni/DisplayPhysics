@@ -1,0 +1,234 @@
+# WARNING: JMH lock is ignored by user request, make sure no other JMH instances are running
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1.1, Java HotSpot(TM) 64-Bit Server VM, 25.0.4.1.1+1-LTS-jvmci-25.4-b23
+# VM invoker: C:\Program Files\Java\graalvm-jdk-25.0.1+8.1\bin\java.exe
+# VM options: -XX:ThreadPriorityPolicy=1 -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCIProduct -XX:+EnableJVMCI -XX:-UnlockExperimentalVMOptions --add-modules=jdk.incubator.vector -XX:+UseParallelGC -XX:-UseJVMCICompiler -Djmh.ignoreLock=true
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 4 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain
+# Parameters: (count = 1024, kernels = scalar)
+
+# Run progress: 0,00% complete, ETA 00:00:42
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/hybrid/build/libs/DisplayPhysics-0.1.0-jmh.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 85231,745 ns/op
+# Warmup Iteration   2: 67583,698 ns/op
+# Warmup Iteration   3: 67394,442 ns/op
+Iteration   1: 65187,806 ns/op
+Iteration   2: 67084,879 ns/op
+Iteration   3: 66992,787 ns/op
+Iteration   4: 68014,415 ns/op
+
+
+Result "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain":
+  66819,972 ±(99.9%) 7637,460 ns/op [Average]
+  (min, avg, max) = (65187,806, 66819,972, 68014,415), stdev = 1181,905
+  CI (99.9%): [59182,512, 74457,432] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1.1, Java HotSpot(TM) 64-Bit Server VM, 25.0.4.1.1+1-LTS-jvmci-25.4-b23
+# VM invoker: C:\Program Files\Java\graalvm-jdk-25.0.1+8.1\bin\java.exe
+# VM options: -XX:ThreadPriorityPolicy=1 -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCIProduct -XX:+EnableJVMCI -XX:-UnlockExperimentalVMOptions --add-modules=jdk.incubator.vector -XX:+UseParallelGC -XX:-UseJVMCICompiler -Djmh.ignoreLock=true
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 4 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain
+# Parameters: (count = 1024, kernels = vector)
+
+# Run progress: 16,67% complete, ETA 00:00:36
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/hybrid/build/libs/DisplayPhysics-0.1.0-jmh.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 299318,881 ns/op
+# Warmup Iteration   2: 214297,794 ns/op
+# Warmup Iteration   3: 212141,649 ns/op
+Iteration   1: 192743,724 ns/op
+Iteration   2: 191203,992 ns/op
+Iteration   3: 191532,951 ns/op
+Iteration   4: 190882,600 ns/op
+
+
+Result "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain":
+  191590,817 ±(99.9%) 5254,710 ns/op [Average]
+  (min, avg, max) = (190882,600, 191590,817, 192743,724), stdev = 813,172
+  CI (99.9%): [186336,106, 196845,527] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1.1, Java HotSpot(TM) 64-Bit Server VM, 25.0.4.1.1+1-LTS-jvmci-25.4-b23
+# VM invoker: C:\Program Files\Java\graalvm-jdk-25.0.1+8.1\bin\java.exe
+# VM options: -XX:ThreadPriorityPolicy=1 -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCIProduct -XX:+EnableJVMCI -XX:-UnlockExperimentalVMOptions --add-modules=jdk.incubator.vector -XX:+UseParallelGC -XX:-UseJVMCICompiler -Djmh.ignoreLock=true
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 4 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain
+# Parameters: (count = 16384, kernels = scalar)
+
+# Run progress: 33,33% complete, ETA 00:00:29
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/hybrid/build/libs/DisplayPhysics-0.1.0-jmh.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1269942,839 ns/op
+# Warmup Iteration   2: 1108931,783 ns/op
+# Warmup Iteration   3: 1115115,367 ns/op
+Iteration   1: 1115343,096 ns/op
+Iteration   2: 1114573,415 ns/op
+Iteration   3: 1116280,624 ns/op
+Iteration   4: 1118983,278 ns/op
+
+
+Result "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain":
+  1116295,103 ±(99.9%) 12428,216 ns/op [Average]
+  (min, avg, max) = (1114573,415, 1116295,103, 1118983,278), stdev = 1923,280
+  CI (99.9%): [1103866,887, 1128723,319] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1.1, Java HotSpot(TM) 64-Bit Server VM, 25.0.4.1.1+1-LTS-jvmci-25.4-b23
+# VM invoker: C:\Program Files\Java\graalvm-jdk-25.0.1+8.1\bin\java.exe
+# VM options: -XX:ThreadPriorityPolicy=1 -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCIProduct -XX:+EnableJVMCI -XX:-UnlockExperimentalVMOptions --add-modules=jdk.incubator.vector -XX:+UseParallelGC -XX:-UseJVMCICompiler -Djmh.ignoreLock=true
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 4 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain
+# Parameters: (count = 16384, kernels = vector)
+
+# Run progress: 50,00% complete, ETA 00:00:22
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/hybrid/build/libs/DisplayPhysics-0.1.0-jmh.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 4961822,277 ns/op
+# Warmup Iteration   2: 3215701,917 ns/op
+# Warmup Iteration   3: 3317335,762 ns/op
+Iteration   1: 3176709,494 ns/op
+Iteration   2: 3085831,077 ns/op
+Iteration   3: 3082409,538 ns/op
+Iteration   4: 3089524,308 ns/op
+
+
+Result "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain":
+  3108618,604 ±(99.9%) 293935,239 ns/op [Average]
+  (min, avg, max) = (3082409,538, 3108618,604, 3176709,494), stdev = 45486,804
+  CI (99.9%): [2814683,365, 3402553,843] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1.1, Java HotSpot(TM) 64-Bit Server VM, 25.0.4.1.1+1-LTS-jvmci-25.4-b23
+# VM invoker: C:\Program Files\Java\graalvm-jdk-25.0.1+8.1\bin\java.exe
+# VM options: -XX:ThreadPriorityPolicy=1 -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCIProduct -XX:+EnableJVMCI -XX:-UnlockExperimentalVMOptions --add-modules=jdk.incubator.vector -XX:+UseParallelGC -XX:-UseJVMCICompiler -Djmh.ignoreLock=true
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 4 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain
+# Parameters: (count = 262144, kernels = scalar)
+
+# Run progress: 66,67% complete, ETA 00:00:14
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/hybrid/build/libs/DisplayPhysics-0.1.0-jmh.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 25173452,500 ns/op
+# Warmup Iteration   2: 19442128,846 ns/op
+# Warmup Iteration   3: 19625613,725 ns/op
+Iteration   1: 19932219,608 ns/op
+Iteration   2: 19433053,846 ns/op
+Iteration   3: 19472301,923 ns/op
+Iteration   4: 19475548,077 ns/op
+
+
+Result "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain":
+  19578280,863 ±(99.9%) 1529864,121 ns/op [Average]
+  (min, avg, max) = (19433053,846, 19578280,863, 19932219,608), stdev = 236748,166
+  CI (99.9%): [18048416,743, 21108144,984] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1.1, Java HotSpot(TM) 64-Bit Server VM, 25.0.4.1.1+1-LTS-jvmci-25.4-b23
+# VM invoker: C:\Program Files\Java\graalvm-jdk-25.0.1+8.1\bin\java.exe
+# VM options: -XX:ThreadPriorityPolicy=1 -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCIProduct -XX:+EnableJVMCI -XX:-UnlockExperimentalVMOptions --add-modules=jdk.incubator.vector -XX:+UseParallelGC -XX:-UseJVMCICompiler -Djmh.ignoreLock=true
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 4 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain
+# Parameters: (count = 262144, kernels = vector)
+
+# Run progress: 83,33% complete, ETA 00:00:07
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/Deni/IdeaProjects/DisplayPhysics-exp/hybrid/build/libs/DisplayPhysics-0.1.0-jmh.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 80183600,000 ns/op
+# Warmup Iteration   2: 54959936,842 ns/op
+# Warmup Iteration   3: 54520147,368 ns/op
+Iteration   1: 52072210,000 ns/op
+Iteration   2: 51013020,000 ns/op
+Iteration   3: 50755040,000 ns/op
+Iteration   4: 50858045,000 ns/op
+
+
+Result "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain":
+  51174578,750 ±(99.9%) 3927219,570 ns/op [Average]
+  (min, avg, max) = (50755040,000, 51174578,750, 52072210,000), stdev = 607741,576
+  CI (99.9%): [47247359,180, 55101798,320] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:44
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                (count)  (kernels)  Mode  Cnt         Score         Error  Units
+KernelBenchmark.terrain     1024     scalar  avgt    4     66819,972 ±    7637,460  ns/op
+KernelBenchmark.terrain     1024     vector  avgt    4    191590,817 ±    5254,710  ns/op
+KernelBenchmark.terrain    16384     scalar  avgt    4   1116295,103 ±   12428,216  ns/op
+KernelBenchmark.terrain    16384     vector  avgt    4   3108618,604 ±  293935,239  ns/op
+KernelBenchmark.terrain   262144     scalar  avgt    4  19578280,863 ± 1529864,121  ns/op
+KernelBenchmark.terrain   262144     vector  avgt    4  51174578,750 ± 3927219,570  ns/op
+
+Benchmark result is saved to benchmarks/r0.json
