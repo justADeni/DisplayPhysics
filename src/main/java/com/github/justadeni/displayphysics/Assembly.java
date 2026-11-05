@@ -1,6 +1,8 @@
 package com.github.justadeni.displayphysics;
 
 import com.github.justadeni.displayphysics.net.Packets;
+import com.github.justadeni.displayphysics.platform.Platform;
+import org.bukkit.Bukkit;
 import com.github.justadeni.displayphysics.sim.Simulator;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -37,6 +39,9 @@ public final class Assembly {
     private static final float VIEW_RANGE = 3f;
 
     private final Logger logger;
+    private final Platform platform;
+    private final CompletableFuture<Void> spawned;
+    private final AtomicBoolean refreshing = new AtomicBoolean();
     private final World world;
     private final List<Piece> pieces;
     private final Viewers viewers;
@@ -54,8 +59,9 @@ public final class Assembly {
     private final float[] sent;
     private boolean anySent;
 
-    Assembly(Logger logger, World world, List<Piece> pieces, Viewers viewers) {
+    Assembly(Logger logger, Platform platform, World world, List<Piece> pieces, Viewers viewers) {
         this.logger = logger;
+        this.platform = platform;
         this.world = world;
         this.pieces = List.copyOf(pieces);
         this.viewers = viewers;
@@ -90,9 +96,18 @@ public final class Assembly {
         centerY = sy / count;
         centerZ = sz / count;
 
-        refreshViewers();
+        spawned = refreshViewers();
         // Safety net: displays nobody ever released would stay on clients until they reload the chunk
         DisplayPhysics.later(this::release, 600_000L);
+    }
+
+    /**
+     * Completes once the displays have been sent to the first viewers. Remove the real blocks
+     * after this, so nobody sees a gap. Immediate except on Folia, where players owned by
+     * other regions are reached through their own thread.
+     */
+    public CompletableFuture<Void> spawned() {
+        return spawned;
     }
 
     /** The pieces this assembly was created from, in order. */
@@ -256,18 +271,43 @@ public final class Assembly {
 
     // ── Viewers ──────────────────────────────────────────────────────────────
 
-    /** Shows the displays to players who came into range and removes them from those who left. */
-    private synchronized void refreshViewers() {
+    /**
+     * Shows the displays to players who came into range and removes them from those who left.
+     * Each player is located on the thread that owns them; the shown set is updated once all answered.
+     */
+    private CompletableFuture<Void> refreshViewers() {
+        if (released.get() || !refreshing.compareAndSet(false, true))
+            return CompletableFuture.completedFuture(null);
+
+        List<CompletableFuture<Player>> checks = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.getWorld().equals(world))
+                continue;
+            checks.add(platform.locate(player).handle((at, error) ->
+                    at != null && error == null && viewers.sees(player, at, centerX, centerY, centerZ) ? player : null));
+        }
+
+        return CompletableFuture.allOf(checks.toArray(CompletableFuture[]::new)).handle((done, error) -> {
+            try {
+                Set<Player> now = ConcurrentHashMap.newKeySet();
+                for (CompletableFuture<Player> check : checks) {
+                    Player player = check.getNow(null);
+                    if (player != null)
+                        now.add(player);
+                }
+                apply(now);
+            } catch (RuntimeException e) {
+                logger.log(Level.WARNING, "Could not update the viewers", e);
+            } finally {
+                refreshing.set(false);
+            }
+            return null;
+        });
+    }
+
+    private synchronized void apply(Set<Player> now) {
         if (released.get())
             return;
-
-        Set<Player> now = ConcurrentHashMap.newKeySet();
-        try {
-            now.addAll(viewers.find(world, centerX, centerY, centerZ));
-        } catch (RuntimeException e) {
-            logger.log(Level.WARNING, "Viewers failed", e);
-            return;
-        }
 
         Object remove = null;
         for (Player player : shown) {

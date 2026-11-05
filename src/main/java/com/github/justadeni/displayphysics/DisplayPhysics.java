@@ -1,6 +1,8 @@
 package com.github.justadeni.displayphysics;
 
 import com.github.justadeni.displayphysics.net.Packets;
+import com.github.justadeni.displayphysics.platform.Platform;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.World;
 
 import java.util.List;
@@ -14,7 +16,7 @@ import java.util.logging.Logger;
  * body, optionally breaking apart when they hit something too hard.
  *
  * <pre>{@code
- * DisplayPhysics physics = DisplayPhysics.create(plugin.getLogger());
+ * DisplayPhysics physics = DisplayPhysics.create(plugin);
  * Assembly assembly = physics.assemble(world, pieces, Viewers.nearby());
  * // ... remove the real blocks a tick later ...
  * assembly.simulate(hinge, settings, terrain, listener).thenAccept(result -> {
@@ -35,9 +37,11 @@ public final class DisplayPhysics {
     });
 
     private final Logger logger;
+    private final Platform platform;
 
-    private DisplayPhysics(Logger logger) {
-        this.logger = logger;
+    private DisplayPhysics(Plugin plugin) {
+        this.logger = plugin.getLogger();
+        this.platform = Platform.detect(plugin);
     }
 
     /** Whether this server can show the packet displays. When false, {@link #create} fails. */
@@ -50,21 +54,22 @@ public final class DisplayPhysics {
         return Packets.failure();
     }
 
-    /** @param logger where problems are reported */
-    public static DisplayPhysics create(Logger logger) {
+    /** @param plugin the owner; problems go to its logger and Folia tasks run as it */
+    public static DisplayPhysics create(Plugin plugin) {
         if (!Packets.available())
             throw new UnsupportedOperationException("DisplayPhysics needs a server 26.1 or newer", Packets.failure());
-        return new DisplayPhysics(logger);
+        return new DisplayPhysics(plugin);
     }
 
     /**
      * Spawns the pieces as displays for the viewers and groups them into one assembly. Nothing
-     * moves until {@link Assembly#simulate}.
+     * moves until {@link Assembly#simulate}. On Folia call it from the thread that owns the pieces'
+     * region, and wait for {@link Assembly#spawned()} before removing the real blocks.
      */
     public Assembly assemble(World world, List<Piece> pieces, Viewers viewers) {
         if (pieces.isEmpty())
             throw new IllegalArgumentException("An assembly needs at least one piece");
-        return new Assembly(logger, world, pieces, viewers);
+        return new Assembly(logger, platform, world, pieces, viewers);
     }
 
     static void later(Runnable task, long millis) {

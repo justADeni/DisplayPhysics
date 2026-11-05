@@ -11,7 +11,7 @@ Supports Spigot, Paper and Folia 26.1, 26.2, 26.3 and newer (servers using Mojan
 tells you whether the current server can be used.
 
 ```java
-DisplayPhysics physics = DisplayPhysics.create(plugin.getLogger());
+DisplayPhysics physics = DisplayPhysics.create(plugin);
 
 // 1. Spawns the displays for the viewers (nothing moves yet). Remove the real blocks a tick later.
 Assembly assembly = physics.assemble(world, pieces, Viewers.nearby());
@@ -37,7 +37,7 @@ assembly.simulate(hinge, new Settings().breakMode(BreakMode.BREAK_ON_IMPACT).bre
 | `Result` | resting position and rotation of every piece |
 | `Viewers` | who sees the displays; newcomers get them mid-fall |
 
-Threading: nothing touches the world, chunks or entities, so it is safe on Folia. Displays that
+Threading: the simulation never touches the world, chunks or entities. The only entity it reads is a player's location, through a `Platform` (plain Bukkit, or Paper/Folia's entity scheduler, which is only loaded where that API exists), so it is safe on Folia. Wait for `assembly.spawned()` before removing the real blocks. Displays that
 nobody releases are removed automatically after the simulation (`Settings.autoReleaseSeconds`).
 
 The physics (`sim` package) has no Bukkit dependency and is covered by headless tests:
