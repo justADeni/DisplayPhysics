@@ -27,7 +27,7 @@ public final class Breakdown {
                 int reps = Math.max(5, 4_000_000 / count);
                 for (int round = 0; round < 5; round++) {
                     for (int r = 0; r < reps; r++) k.terrain(b, 0, count, grid, 0.0125f);
-                    java.util.Arrays.fill(com.github.justadeni.displayphysics.sim.Hook.times(), 0);
+                    java.util.Arrays.fill(Hook.times(), 0);
                     long t = System.nanoTime();
                     for (int r = 0; r < reps; r++) k.terrain(b, 0, count, grid, 0.0125f);
                     long dt = System.nanoTime() - t;
@@ -38,7 +38,7 @@ public final class Breakdown {
                         System.out.printf("%-6s %7d: %6.1f ns/piece", name, count, per);
                         if (name.equals("vector"))
                             System.out.printf("   prefilter %5.1f (%.0f%% pass) probe+in %5.1f  solve %5.1f  out %5.1f   (contacts in %.0f%% of pieces)", T[5] / n, 100.0 * T[6] / T[4], T[0] / n, T[1] / n, T[2] / n, 100.0 * T[3] / T[4]);
-                        System.out.println();
+                                                System.out.println();
                     }
                 }
             }

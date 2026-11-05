@@ -20,7 +20,7 @@ public final class VectorKernels implements Kernels {
     private static final int L = SP.length();
 
     /** Pieces handled per chunk: keeps the scratch records in cache. */
-    private static final int CH = 1024;
+    private static final int CH = 4096;
     private static final int GS = CH + L;           // one group's capacity (plus a vector of slack for the tail)
     private static final int CHS = CH + L;
     private static final int GROUPS = 9;            // groups of 0..8 contacts (0 unused)
@@ -103,7 +103,7 @@ public final class VectorKernels implements Kernels {
         final byte[] cells = grid.cells;
         for (int i = from; i < to; i += L)
             corners(cc, i - from, b, i, SP.indexInRange(i, to), grid.x0, grid.y0, grid.z0, grid.sx, grid.sz);
-        int nh = 0;
+                int nh = 0;
         final int n = to - from;
         for (int j = 0; j < n; j++) {
             int t0 = cells[cc[j]], t1 = cells[cc[CHS + j]], t2 = cells[cc[2 * CHS + j]], t3 = cells[cc[3 * CHS + j]];
