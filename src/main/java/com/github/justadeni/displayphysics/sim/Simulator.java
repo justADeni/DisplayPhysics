@@ -78,7 +78,8 @@ public final class Simulator {
     private final Vector3f hingePivot = new Vector3f();
     private final Vector3f hingeArm = new Vector3f();
 
-    private Debris debris;
+    private FlatDebris debris;
+    private final Kernels kernels;
     private Phase phase;
     private int tick = 0;
     private int freeTicks = 0;
@@ -140,6 +141,7 @@ public final class Simulator {
         }
 
         terrain = new Voxels(source, ox, oy, oz);
+        kernels = settings.simd ? Kernels.best() : Kernels.scalar();
         // The host's copy can be old: catch up on what changed meanwhile right away
         // instead of at the first regular refresh.
         if (source.ageMillis() >= TERRAIN_REFRESH_TICKS * TICK_MS)
@@ -293,6 +295,8 @@ public final class Simulator {
     private void refreshTerrain() {
         if (terrainRefresh != null && terrainRefresh.isDone()) {
             terrain.invalidate();
+            if (debris != null)
+                debris.invalidate();
             terrainRefresh = null;
         }
         if (terrainRefresh == null && tick % TERRAIN_REFRESH_TICKS == 0)
@@ -413,11 +417,11 @@ public final class Simulator {
      * @param sleepUnthrown whether pieces the kick left alone start asleep, as solid ground for the others
      */
     private void shatter(boolean sleepUnthrown, Kick kick) {
-        var pieces = new Body[count];
+        var bodies = new Bodies(count);
         var thrown = new boolean[count];
+        var piece = new Body();
 
         for (int i = 0; i < count; i++) {
-            var piece = new Body();
             body.q.transform(off[3 * i] + 0.5f - com0.x, off[3 * i + 1] + 0.5f - com0.y, off[3 * i + 2] + 0.5f - com0.z, r);
 
             piece.x.set(body.x).add(r);
@@ -426,14 +430,19 @@ public final class Simulator {
             piece.w.set(body.w);
 
             thrown[i] = kick.apply(i, piece, r);
-            Debris.makeCube(piece, mass[i]);
-            pieces[i] = piece;
+
+            FlatDebris.initCube(bodies, i, mass[i], hard[i], settings.friction, settings.bounciness, settings.softBounciness);
+            bodies.px[i] = piece.x.x; bodies.py[i] = piece.x.y; bodies.pz[i] = piece.x.z;
+            bodies.vx[i] = piece.v.x; bodies.vy[i] = piece.v.y; bodies.vz[i] = piece.v.z;
+            bodies.wx[i] = piece.w.x; bodies.wy[i] = piece.w.y; bodies.wz[i] = piece.w.z;
+            bodies.qx[i] = piece.q.x; bodies.qy[i] = piece.q.y; bodies.qz[i] = piece.q.z; bodies.qw[i] = piece.q.w;
         }
 
-        debris = new Debris(terrain, pieces, hard, settings.gravity, settings.friction, settings.bounciness, settings.softBounciness);
+        debris = new FlatDebris(bodies, source, ox, oy, oz, settings.gravity, settings.friction, settings.softBounciness, kernels);
         if (sleepUnthrown)
             for (int i = 0; i < count; i++)
-                debris.asleep[i] = !thrown[i];
+                if (!thrown[i])
+                    debris.sleep(i);
         phase = Phase.DEBRIS;
         brokeNow = true;
         pendingBreak = false;
@@ -567,11 +576,10 @@ public final class Simulator {
             rotation.set(body.q);
             translation.set(r.x - off[3 * i], r.y - off[3 * i + 1], r.z - off[3 * i + 2]);
         } else {
-            Body p = debris.pieces[i];
             // Display origin sits at the cube's corner: centre - q * (0.5, 0.5, 0.5)
-            p.q.transform(0.5f, 0.5f, 0.5f, r);
-            rotation.set(p.q);
-            translation.set(p.x.x - r.x - off[3 * i], p.x.y - r.y - off[3 * i + 1], p.x.z - r.z - off[3 * i + 2]);
+            rotation.set(debris.qx(i), debris.qy(i), debris.qz(i), debris.qw(i));
+            rotation.transform(0.5f, 0.5f, 0.5f, r);
+            translation.set(debris.x(i) - r.x - off[3 * i], debris.y(i) - r.y - off[3 * i + 1], debris.z(i) - r.z - off[3 * i + 2]);
         }
     }
 
@@ -584,7 +592,10 @@ public final class Simulator {
     }
 
     public void restingRotation(int i, Quaternionf out) {
-        out.set(debris == null ? body.q : debris.pieces[i].q);
+        if (debris == null)
+            out.set(body.q);
+        else
+            out.set(debris.qx(i), debris.qy(i), debris.qz(i), debris.qw(i));
     }
 
     public double centerX(int i) { computeKinematics(); return ox + centre[3 * i]; }
@@ -597,7 +608,7 @@ public final class Simulator {
     }
 
     public boolean asleep(int i) {
-        return debris != null && debris.asleep[i];
+        return debris != null && debris.asleep(i);
     }
 
     /** Whether the centre of piece {@code i} is touching or sunk into solid terrain. */
@@ -625,11 +636,10 @@ public final class Simulator {
             }
         } else {
             for (int i = 0; i < count; i++) {
-                Body p = debris.pieces[i];
-                centre[3 * i] = p.x.x;
-                centre[3 * i + 1] = p.x.y;
-                centre[3 * i + 2] = p.x.z;
-                speed[i] = p.v.length();
+                centre[3 * i] = debris.x(i);
+                centre[3 * i + 1] = debris.y(i);
+                centre[3 * i + 2] = debris.z(i);
+                speed[i] = debris.speed(i);
             }
         }
     }
