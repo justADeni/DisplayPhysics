@@ -16,6 +16,30 @@ final class Tuning {
     static final float LIQUID_DRAG = 2.5f;
     /** Extra angular damping while touching something: rough surfaces dig in, so assemblies don't roll like balls. */
     static final float ROLLING_RESISTANCE = 2.0f;
+    // ── Debris: stepping ──
+    static final int SUBSTEPS = 4;
+    /**
+     * Solver iterations per substep. Small substeps do the converging (a few fast, light passes beat many slow
+     * ones), so three are enough (two let a fast piece tunnel through the ground).
+     */
+    static final int ITERATIONS = 3;
+    /** Half-size of a cube for terrain probes, pulled in a hair so neighbours never start overlapping. */
+    static final float CORNER = 0.49f;
+    /** Every corner of a cube is this far from its centre, squared, however the cube is turned. */
+    static final float CORNER_REACH_SQ = 3f * CORNER * CORNER;
+
+    // ── Debris: contacts ──
+    static final float SLOP = 0.01f;
+    static final float BAUMGARTE = 0.4f;
+    /** Most penetration (blocks) a single contact may correct per step. */
+    static final float MAX_CORRECTION = 0.3f;
+    /** Below this approach speed contacts don't bounce, so resting bodies settle. */
+    static final float BOUNCE_THRESHOLD = 1.0f;
+    /** A probe can't have entered a voxel through a face it is moving out of faster than this (blocks per second). */
+    static final float MAX_EXIT_SPEED = 0.5f;
+    /** Nothing simulated should ever move faster than this; a hard stop for solver blow-ups. */
+    static final float MAX_SPEED = 40f, MAX_SPIN = 25f;
+
     /** Ticks a body must stay calm while touching something before it counts as settled. */
     static final int CALM_TICKS_TO_SLEEP = 10;
 

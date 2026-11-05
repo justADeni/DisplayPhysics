@@ -1,0 +1,3196 @@
+[
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 4.954445235073869E-6,
+            "scoreError" : 1.3888081170564584E-6,
+            "scoreConfidence" : [
+                3.5656371180174107E-6,
+                6.343253352130328E-6
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.786324215113481E-6,
+                "50.0" : 4.797498873509118E-6,
+                "90.0" : 5.599554629925028E-6,
+                "95.0" : 5.599554629925028E-6,
+                "99.0" : 5.599554629925028E-6,
+                "99.9" : 5.599554629925028E-6,
+                "99.99" : 5.599554629925028E-6,
+                "99.999" : 5.599554629925028E-6,
+                "99.9999" : 5.599554629925028E-6,
+                "100.0" : 5.599554629925028E-6
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    4.786324215113481E-6,
+                    4.797498873509118E-6,
+                    4.799536094636724E-6,
+                    4.789312362184996E-6,
+                    5.599554629925028E-6
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 1.7289299974855014E-5,
+            "scoreError" : 3.1797778103394436E-7,
+            "scoreConfidence" : [
+                1.697132219382107E-5,
+                1.760727775588896E-5
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.7186411797465998E-5,
+                "50.0" : 1.7268435000733115E-5,
+                "90.0" : 1.7409536855380686E-5,
+                "95.0" : 1.7409536855380686E-5,
+                "99.0" : 1.7409536855380686E-5,
+                "99.9" : 1.7409536855380686E-5,
+                "99.99" : 1.7409536855380686E-5,
+                "99.999" : 1.7409536855380686E-5,
+                "99.9999" : 1.7409536855380686E-5,
+                "100.0" : 1.7409536855380686E-5
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.7268435000733115E-5,
+                    1.7261125087766205E-5,
+                    1.7409536855380686E-5,
+                    1.7320991132929062E-5,
+                    1.7186411797465998E-5
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 1.033254835947575E-5,
+            "scoreError" : 1.4747850507368588E-6,
+            "scoreConfidence" : [
+                8.857763308738892E-6,
+                1.180733341021261E-5
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.0112177812415547E-5,
+                "50.0" : 1.0199973406567441E-5,
+                "90.0" : 1.101245499670002E-5,
+                "95.0" : 1.101245499670002E-5,
+                "99.0" : 1.101245499670002E-5,
+                "99.9" : 1.101245499670002E-5,
+                "99.99" : 1.101245499670002E-5,
+                "99.999" : 1.101245499670002E-5,
+                "99.9999" : 1.101245499670002E-5,
+                "100.0" : 1.101245499670002E-5
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.0199973406567441E-5,
+                    1.101245499670002E-5,
+                    1.0218477640213178E-5,
+                    1.011965794148256E-5,
+                    1.0112177812415547E-5
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 6.463347299537615E-5,
+            "scoreError" : 1.0521897969785627E-6,
+            "scoreConfidence" : [
+                6.358128319839758E-5,
+                6.568566279235471E-5
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6.419832385651525E-5,
+                "50.0" : 6.469330304654195E-5,
+                "90.0" : 6.489729336244268E-5,
+                "95.0" : 6.489729336244268E-5,
+                "99.0" : 6.489729336244268E-5,
+                "99.9" : 6.489729336244268E-5,
+                "99.99" : 6.489729336244268E-5,
+                "99.999" : 6.489729336244268E-5,
+                "99.9999" : 6.489729336244268E-5,
+                "100.0" : 6.489729336244268E-5
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    6.456692878227076E-5,
+                    6.489729336244268E-5,
+                    6.48115159291101E-5,
+                    6.469330304654195E-5,
+                    6.419832385651525E-5
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 3.408297567598043E-5,
+            "scoreError" : 4.128407865696026E-6,
+            "scoreConfidence" : [
+                2.9954567810284402E-5,
+                3.821138354167645E-5
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3.3046423305680915E-5,
+                "50.0" : 3.384262936900424E-5,
+                "90.0" : 3.557137324813664E-5,
+                "95.0" : 3.557137324813664E-5,
+                "99.0" : 3.557137324813664E-5,
+                "99.9" : 3.557137324813664E-5,
+                "99.99" : 3.557137324813664E-5,
+                "99.999" : 3.557137324813664E-5,
+                "99.9999" : 3.557137324813664E-5,
+                "100.0" : 3.557137324813664E-5
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.319364840684905E-5,
+                    3.557137324813664E-5,
+                    3.3046423305680915E-5,
+                    3.4760804050231275E-5,
+                    3.384262936900424E-5
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 3.454339544000676E-4,
+            "scoreError" : 6.352132892560688E-6,
+            "scoreConfidence" : [
+                3.390818215075069E-4,
+                3.5178608729262824E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3.4325113062400124E-4,
+                "50.0" : 3.450461732169054E-4,
+                "90.0" : 3.4763731173203096E-4,
+                "95.0" : 3.4763731173203096E-4,
+                "99.0" : 3.4763731173203096E-4,
+                "99.9" : 3.4763731173203096E-4,
+                "99.99" : 3.4763731173203096E-4,
+                "99.999" : 3.4763731173203096E-4,
+                "99.9999" : 3.4763731173203096E-4,
+                "100.0" : 3.4763731173203096E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.4325113062400124E-4,
+                    3.4763731173203096E-4,
+                    3.463413831237302E-4,
+                    3.448937733036702E-4,
+                    3.450461732169054E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 2.3566460420274378E-4,
+            "scoreError" : 4.795808049722611E-6,
+            "scoreConfidence" : [
+                2.3086879615302118E-4,
+                2.404604122524664E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.3355486818148834E-4,
+                "50.0" : 2.3615965727779407E-4,
+                "90.0" : 2.3678691504754564E-4,
+                "95.0" : 2.3678691504754564E-4,
+                "99.0" : 2.3678691504754564E-4,
+                "99.9" : 2.3678691504754564E-4,
+                "99.99" : 2.3678691504754564E-4,
+                "99.999" : 2.3678691504754564E-4,
+                "99.9999" : 2.3678691504754564E-4,
+                "100.0" : 2.3678691504754564E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.361635583221297E-4,
+                    2.3565802218476124E-4,
+                    2.3615965727779407E-4,
+                    2.3678691504754564E-4,
+                    2.3355486818148834E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 8.78063073510961E-4,
+            "scoreError" : 1.8640568649985035E-5,
+            "scoreConfidence" : [
+                8.594225048609759E-4,
+                8.96703642160946E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 8.706898526462278E-4,
+                "50.0" : 8.793437250923216E-4,
+                "90.0" : 8.822912933260431E-4,
+                "95.0" : 8.822912933260431E-4,
+                "99.0" : 8.822912933260431E-4,
+                "99.9" : 8.822912933260431E-4,
+                "99.99" : 8.822912933260431E-4,
+                "99.999" : 8.822912933260431E-4,
+                "99.9999" : 8.822912933260431E-4,
+                "100.0" : 8.822912933260431E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    8.706898526462278E-4,
+                    8.759855208190111E-4,
+                    8.82004975671201E-4,
+                    8.822912933260431E-4,
+                    8.793437250923216E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 8.186641027132478E-4,
+            "scoreError" : 1.2723993045245274E-5,
+            "scoreConfidence" : [
+                8.059401096680025E-4,
+                8.313880957584931E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 8.15454255606811E-4,
+                "50.0" : 8.173974916360933E-4,
+                "90.0" : 8.227066983620437E-4,
+                "95.0" : 8.227066983620437E-4,
+                "99.0" : 8.227066983620437E-4,
+                "99.9" : 8.227066983620437E-4,
+                "99.99" : 8.227066983620437E-4,
+                "99.999" : 8.227066983620437E-4,
+                "99.9999" : 8.227066983620437E-4,
+                "100.0" : 8.227066983620437E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    8.173974916360933E-4,
+                    8.15454255606811E-4,
+                    8.227066983620437E-4,
+                    8.161123154810174E-4,
+                    8.216497524802735E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.0040016399382322545,
+            "scoreError" : 5.96869400943795E-5,
+            "scoreConfidence" : [
+                0.003941952998137875,
+                0.004061326878326634
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.003974409771151015,
+                "50.0" : 0.0040073309760893005,
+                "90.0" : 0.004012708945355494,
+                "95.0" : 0.004012708945355494,
+                "99.0" : 0.004012708945355494,
+                "99.9" : 0.004012708945355494,
+                "99.99" : 0.004012708945355494,
+                "99.999" : 0.004012708945355494,
+                "99.9999" : 0.004012708945355494,
+                "100.0" : 0.004012708945355494
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.00400465480404476,
+                    0.003974409771151015,
+                    0.0040090951945207,
+                    0.0040073309760893005,
+                    0.004012708945355494
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.0038566579946439743,
+            "scoreError" : 5.212310550933281E-5,
+            "scoreConfidence" : [
+                0.0038045348891346414,
+                0.003908781100153307
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.003833130857077816,
+                "50.0" : 0.0038604187616859058,
+                "90.0" : 0.0038677184753874464,
+                "95.0" : 0.0038677184753874464,
+                "99.0" : 0.0038677184753874464,
+                "99.9" : 0.0038677184753874464,
+                "99.99" : 0.0038677184753874464,
+                "99.999" : 0.0038677184753874464,
+                "99.9999" : 0.0038677184753874464,
+                "100.0" : 0.0038677184753874464
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.003833130857077816,
+                    0.0038625944983707505,
+                    0.0038677184753874464,
+                    0.0038594273806979514,
+                    0.0038604187616859058
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.017053843368776533,
+            "scoreError" : 2.8550350101526844E-4,
+            "scoreConfidence" : [
+                0.016768339867761266,
+                0.0173393468697918
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.01694474579680507,
+                "50.0" : 0.01706821039821513,
+                "90.0" : 0.017119440783916202,
+                "95.0" : 0.017119440783916202,
+                "99.0" : 0.017119440783916202,
+                "99.9" : 0.017119440783916202,
+                "99.99" : 0.017119440783916202,
+                "99.999" : 0.017119440783916202,
+                "99.9999" : 0.017119440783916202,
+                "100.0" : 0.017119440783916202
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.01711917142324825,
+                    0.017119440783916202,
+                    0.01694474579680507,
+                    0.01706821039821513,
+                    0.01701764844169801
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.017732180060090662,
+            "scoreError" : 0.004075430059664439,
+            "scoreConfidence" : [
+                0.013656750000426224,
+                0.0218076101197551
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.016852159562586476,
+                "50.0" : 0.01709249277175659,
+                "90.0" : 0.018928114000227092,
+                "95.0" : 0.018928114000227092,
+                "99.0" : 0.018928114000227092,
+                "99.9" : 0.018928114000227092,
+                "99.99" : 0.018928114000227092,
+                "99.999" : 0.018928114000227092,
+                "99.9999" : 0.018928114000227092,
+                "100.0" : 0.018928114000227092
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.016852159562586476,
+                    0.01694161423993826,
+                    0.01709249277175659,
+                    0.018928114000227092,
+                    0.018846519725944887
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.calm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.07871816245360233,
+            "scoreError" : 0.0036120132651007815,
+            "scoreConfidence" : [
+                0.07510614918850154,
+                0.08233017571870312
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.07716261761530156,
+                "50.0" : 0.07889209903800662,
+                "90.0" : 0.07970560293297202,
+                "95.0" : 0.07970560293297202,
+                "99.0" : 0.07970560293297202,
+                "99.9" : 0.07970560293297202,
+                "99.99" : 0.07970560293297202,
+                "99.999" : 0.07970560293297202,
+                "99.9999" : 0.07970560293297202,
+                "100.0" : 0.07970560293297202
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.07716261761530156,
+                    0.07970560293297202,
+                    0.07882334305303806,
+                    0.07900714962869332,
+                    0.07889209903800662
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 3.57475993740896E-4,
+            "scoreError" : 2.957530198032014E-4,
+            "scoreConfidence" : [
+                6.17229739376946E-5,
+                6.532290135440974E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.7102789659394456E-4,
+                "50.0" : 4.1069334710628437E-4,
+                "90.0" : 4.168739082912611E-4,
+                "95.0" : 4.168739082912611E-4,
+                "99.0" : 4.168739082912611E-4,
+                "99.9" : 4.168739082912611E-4,
+                "99.99" : 4.168739082912611E-4,
+                "99.999" : 4.168739082912611E-4,
+                "99.9999" : 4.168739082912611E-4,
+                "100.0" : 4.168739082912611E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.7102789659394456E-4,
+                    2.757597359757783E-4,
+                    4.1302508073721143E-4,
+                    4.168739082912611E-4,
+                    4.1069334710628437E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 1.2171304766748588E-4,
+            "scoreError" : 2.649966282370308E-6,
+            "scoreConfidence" : [
+                1.1906308138511557E-4,
+                1.243630139498562E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.2067175163213057E-4,
+                "50.0" : 1.2200542535055802E-4,
+                "90.0" : 1.223750001221919E-4,
+                "95.0" : 1.223750001221919E-4,
+                "99.0" : 1.223750001221919E-4,
+                "99.9" : 1.223750001221919E-4,
+                "99.99" : 1.223750001221919E-4,
+                "99.999" : 1.223750001221919E-4,
+                "99.9999" : 1.223750001221919E-4,
+                "100.0" : 1.223750001221919E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.2067175163213057E-4,
+                    1.2213247291156703E-4,
+                    1.2200542535055802E-4,
+                    1.2138058832098178E-4,
+                    1.223750001221919E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.001142994593990566,
+            "scoreError" : 9.847840811047152E-4,
+            "scoreConfidence" : [
+                1.5821051288585075E-4,
+                0.002127778675095281
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0010057684982789376,
+                "50.0" : 0.0010099133752352945,
+                "90.0" : 0.001595627906531835,
+                "95.0" : 0.001595627906531835,
+                "99.0" : 0.001595627906531835,
+                "99.9" : 0.001595627906531835,
+                "99.99" : 0.001595627906531835,
+                "99.999" : 0.001595627906531835,
+                "99.9999" : 0.001595627906531835,
+                "100.0" : 0.001595627906531835
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.001595627906531835,
+                    0.0010941560463792314,
+                    0.0010095071435275312,
+                    0.0010057684982789376,
+                    0.0010099133752352945
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 4.528337480193023E-4,
+            "scoreError" : 4.0047331023283116E-5,
+            "scoreConfidence" : [
+                4.1278641699601915E-4,
+                4.928810790425854E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.4464530785628704E-4,
+                "50.0" : 4.48773260058649E-4,
+                "90.0" : 4.705456163581532E-4,
+                "95.0" : 4.705456163581532E-4,
+                "99.0" : 4.705456163581532E-4,
+                "99.9" : 4.705456163581532E-4,
+                "99.99" : 4.705456163581532E-4,
+                "99.999" : 4.705456163581532E-4,
+                "99.9999" : 4.705456163581532E-4,
+                "100.0" : 4.705456163581532E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    4.48773260058649E-4,
+                    4.705456163581532E-4,
+                    4.4464530785628704E-4,
+                    4.533025474056316E-4,
+                    4.469020084177909E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.004725461437059648,
+            "scoreError" : 0.005501430246924397,
+            "scoreConfidence" : [
+                -7.759688098647483E-4,
+                0.010226891683984045
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0039122674400425255,
+                "50.0" : 0.003959014868785049,
+                "90.0" : 0.007229502508421646,
+                "95.0" : 0.007229502508421646,
+                "99.0" : 0.007229502508421646,
+                "99.9" : 0.007229502508421646,
+                "99.99" : 0.007229502508421646,
+                "99.999" : 0.007229502508421646,
+                "99.9999" : 0.007229502508421646,
+                "100.0" : 0.007229502508421646
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.007229502508421646,
+                    0.004593848101498069,
+                    0.003932674266550954,
+                    0.003959014868785049,
+                    0.0039122674400425255
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.002110744667081343,
+            "scoreError" : 3.587268630525447E-4,
+            "scoreConfidence" : [
+                0.0017520178040287984,
+                0.0024694715301338877
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.001987203840437454,
+                "50.0" : 0.002106004759870629,
+                "90.0" : 0.0022424685301200495,
+                "95.0" : 0.0022424685301200495,
+                "99.0" : 0.0022424685301200495,
+                "99.9" : 0.0022424685301200495,
+                "99.99" : 0.0022424685301200495,
+                "99.999" : 0.0022424685301200495,
+                "99.9999" : 0.0022424685301200495,
+                "100.0" : 0.0022424685301200495
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.0022424685301200495,
+                    0.002141220970883751,
+                    0.001987203840437454,
+                    0.002106004759870629,
+                    0.0020768252340948334
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.024438567569424308,
+            "scoreError" : 0.049276719341516645,
+            "scoreConfidence" : [
+                -0.024838151772092337,
+                0.07371528691094095
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.016590714570063694,
+                "50.0" : 0.016845412141113077,
+                "90.0" : 0.046232427561347565,
+                "95.0" : 0.046232427561347565,
+                "99.0" : 0.046232427561347565,
+                "99.9" : 0.046232427561347565,
+                "99.99" : 0.046232427561347565,
+                "99.999" : 0.046232427561347565,
+                "99.9999" : 0.046232427561347565,
+                "100.0" : 0.046232427561347565
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.046232427561347565,
+                    0.025770861438648884,
+                    0.016845412141113077,
+                    0.016590714570063694,
+                    0.016753422135948326
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.008287130267971312,
+            "scoreError" : 4.127421993248689E-4,
+            "scoreConfidence" : [
+                0.007874388068646442,
+                0.008699872467296182
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.008175952781910632,
+                "50.0" : 0.00827653190380463,
+                "90.0" : 0.00842274543451014,
+                "95.0" : 0.00842274543451014,
+                "99.0" : 0.00842274543451014,
+                "99.9" : 0.00842274543451014,
+                "99.99" : 0.00842274543451014,
+                "99.999" : 0.00842274543451014,
+                "99.9999" : 0.00842274543451014,
+                "100.0" : 0.00842274543451014
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.008366804302944692,
+                    0.00842274543451014,
+                    0.00827653190380463,
+                    0.008193616916686465,
+                    0.008175952781910632
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.08608078622128582,
+            "scoreError" : 0.11252926787304647,
+            "scoreConfidence" : [
+                -0.026448481651760655,
+                0.1986100540943323
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0689797848127457,
+                "50.0" : 0.06989851236206174,
+                "90.0" : 0.1368898509095883,
+                "95.0" : 0.1368898509095883,
+                "99.0" : 0.1368898509095883,
+                "99.9" : 0.1368898509095883,
+                "99.99" : 0.1368898509095883,
+                "99.999" : 0.1368898509095883,
+                "99.9999" : 0.1368898509095883,
+                "100.0" : 0.1368898509095883
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.1368898509095883,
+                    0.08527409520565443,
+                    0.06989851236206174,
+                    0.0689797848127457,
+                    0.06936168781637889
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.030973680954887766,
+            "scoreError" : 0.0010099348414446365,
+            "scoreConfidence" : [
+                0.02996374611344313,
+                0.0319836157963324
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.030582096029829763,
+                "50.0" : 0.03097471762339471,
+                "90.0" : 0.03123599100927169,
+                "95.0" : 0.03123599100927169,
+                "99.0" : 0.03123599100927169,
+                "99.9" : 0.03123599100927169,
+                "99.99" : 0.03123599100927169,
+                "99.999" : 0.03123599100927169,
+                "99.9999" : 0.03123599100927169,
+                "100.0" : 0.03123599100927169
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.030582096029829763,
+                    0.03123599100927169,
+                    0.03088815427847945,
+                    0.03118744583346323,
+                    0.03097471762339471
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.4772995927391438,
+            "scoreError" : 0.021906534858729856,
+            "scoreConfidence" : [
+                0.45539305788041395,
+                0.49920612759787364
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.47362163825757575,
+                "50.0" : 0.4750426944971537,
+                "90.0" : 0.48730077934729665,
+                "95.0" : 0.48730077934729665,
+                "99.0" : 0.48730077934729665,
+                "99.9" : 0.48730077934729665,
+                "99.99" : 0.48730077934729665,
+                "99.999" : 0.48730077934729665,
+                "99.9999" : 0.48730077934729665,
+                "100.0" : 0.48730077934729665
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.48730077934729665,
+                    0.4763954285714286,
+                    0.4741374230222643,
+                    0.47362163825757575,
+                    0.4750426944971537
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.18141689075438847,
+            "scoreError" : 0.022915650465670574,
+            "scoreConfidence" : [
+                0.1585012402887179,
+                0.20433254122005903
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.17459987787857642,
+                "50.0" : 0.17999577566061478,
+                "90.0" : 0.18810112824370065,
+                "95.0" : 0.18810112824370065,
+                "99.0" : 0.18810112824370065,
+                "99.9" : 0.18810112824370065,
+                "99.99" : 0.18810112824370065,
+                "99.999" : 0.18810112824370065,
+                "99.9999" : 0.18810112824370065,
+                "100.0" : 0.18810112824370065
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.18705623481024491,
+                    0.18810112824370065,
+                    0.17999577566061478,
+                    0.1773314371788056,
+                    0.17459987787857642
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 1.3173772968783182,
+            "scoreError" : 0.05665282478886416,
+            "scoreConfidence" : [
+                1.260724472089454,
+                1.3740301216671824
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.292191870967742,
+                "50.0" : 1.320231884057971,
+                "90.0" : 1.3291698938992043,
+                "95.0" : 1.3291698938992043,
+                "99.0" : 1.3291698938992043,
+                "99.9" : 1.3291698938992043,
+                "99.99" : 1.3291698938992043,
+                "99.999" : 1.3291698938992043,
+                "99.9999" : 1.3291698938992043,
+                "100.0" : 1.3291698938992043
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.3264405298013244,
+                    1.320231884057971,
+                    1.3291698938992043,
+                    1.3188523056653492,
+                    1.292191870967742
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.forces",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.7628433720720315,
+            "scoreError" : 0.17722982793427672,
+            "scoreConfidence" : [
+                0.5856135441377548,
+                0.9400732000063081
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.710167494677076,
+                "50.0" : 0.7918428797468354,
+                "90.0" : 0.8041591164658635,
+                "95.0" : 0.8041591164658635,
+                "99.0" : 0.8041591164658635,
+                "99.9" : 0.8041591164658635,
+                "99.99" : 0.8041591164658635,
+                "99.999" : 0.8041591164658635,
+                "99.9999" : 0.8041591164658635,
+                "100.0" : 0.8041591164658635
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.710167494677076,
+                    0.7153242315939957,
+                    0.7927231378763867,
+                    0.8041591164658635,
+                    0.7918428797468354
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 5.945832606551522E-4,
+            "scoreError" : 2.3814705340681257E-5,
+            "scoreConfidence" : [
+                5.707685553144709E-4,
+                6.183979659958335E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.904879461552224E-4,
+                "50.0" : 5.923574391665716E-4,
+                "90.0" : 6.055478269604192E-4,
+                "95.0" : 6.055478269604192E-4,
+                "99.0" : 6.055478269604192E-4,
+                "99.9" : 6.055478269604192E-4,
+                "99.99" : 6.055478269604192E-4,
+                "99.999" : 6.055478269604192E-4,
+                "99.9999" : 6.055478269604192E-4,
+                "100.0" : 6.055478269604192E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    5.904879461552224E-4,
+                    6.055478269604192E-4,
+                    5.923574391665716E-4,
+                    5.926282575267557E-4,
+                    5.918948334667919E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 1.1145084922344813E-4,
+            "scoreError" : 3.4685166839857413E-6,
+            "scoreConfidence" : [
+                1.0798233253946238E-4,
+                1.1491936590743387E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.0988289372038233E-4,
+                "50.0" : 1.1180200305189948E-4,
+                "90.0" : 1.1202576136402184E-4,
+                "95.0" : 1.1202576136402184E-4,
+                "99.0" : 1.1202576136402184E-4,
+                "99.9" : 1.1202576136402184E-4,
+                "99.99" : 1.1202576136402184E-4,
+                "99.999" : 1.1202576136402184E-4,
+                "99.9999" : 1.1202576136402184E-4,
+                "100.0" : 1.1202576136402184E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.0988289372038233E-4,
+                    1.1151963756054551E-4,
+                    1.1202395042039143E-4,
+                    1.1180200305189948E-4,
+                    1.1202576136402184E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.0020400676718318857,
+            "scoreError" : 3.991464695062262E-5,
+            "scoreConfidence" : [
+                0.002000153024881263,
+                0.0020799823187825084
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0020238722135166557,
+                "50.0" : 0.0020413343938327877,
+                "90.0" : 0.0020497466854170632,
+                "95.0" : 0.0020497466854170632,
+                "99.0" : 0.0020497466854170632,
+                "99.9" : 0.0020497466854170632,
+                "99.99" : 0.0020497466854170632,
+                "99.999" : 0.0020497466854170632,
+                "99.9999" : 0.0020497466854170632,
+                "100.0" : 0.0020497466854170632
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.0020480976686383023,
+                    0.0020497466854170632,
+                    0.002037287397754619,
+                    0.0020413343938327877,
+                    0.0020238722135166557
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 3.8026769438876176E-4,
+            "scoreError" : 1.2723876860601813E-5,
+            "scoreConfidence" : [
+                3.6754381752815993E-4,
+                3.929915712493636E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3.7752793977621004E-4,
+                "50.0" : 3.782723401745873E-4,
+                "90.0" : 3.842515298372458E-4,
+                "95.0" : 3.842515298372458E-4,
+                "99.0" : 3.842515298372458E-4,
+                "99.9" : 3.842515298372458E-4,
+                "99.99" : 3.842515298372458E-4,
+                "99.999" : 3.842515298372458E-4,
+                "99.9999" : 3.842515298372458E-4,
+                "100.0" : 3.842515298372458E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.842515298372458E-4,
+                    3.83474769064117E-4,
+                    3.7752793977621004E-4,
+                    3.782723401745873E-4,
+                    3.7781189309164895E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.00849634699559953,
+            "scoreError" : 1.9481632139321052E-4,
+            "scoreConfidence" : [
+                0.008301530674206319,
+                0.008691163316992741
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.008409558397501028,
+                "50.0" : 0.008510180495598083,
+                "90.0" : 0.008540813349371689,
+                "95.0" : 0.008540813349371689,
+                "99.0" : 0.008540813349371689,
+                "99.9" : 0.008540813349371689,
+                "99.99" : 0.008540813349371689,
+                "99.999" : 0.008540813349371689,
+                "99.9999" : 0.008540813349371689,
+                "100.0" : 0.008540813349371689
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.008409558397501028,
+                    0.008502467573283953,
+                    0.008518715162242892,
+                    0.008510180495598083,
+                    0.008540813349371689
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.002341524299449247,
+            "scoreError" : 1.2303989267098457E-4,
+            "scoreConfidence" : [
+                0.0022184844067782623,
+                0.0024645641921202314
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.002285130719700951,
+                "50.0" : 0.002356312026992639,
+                "90.0" : 0.002360390618731386,
+                "95.0" : 0.002360390618731386,
+                "99.0" : 0.002360390618731386,
+                "99.9" : 0.002360390618731386,
+                "99.99" : 0.002360390618731386,
+                "99.999" : 0.002360390618731386,
+                "99.9999" : 0.002360390618731386,
+                "100.0" : 0.002360390618731386
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.002285130719700951,
+                    0.002346952657376622,
+                    0.0023588354744446356,
+                    0.002356312026992639,
+                    0.002360390618731386
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.03488434807069932,
+            "scoreError" : 9.128170954271193E-4,
+            "scoreConfidence" : [
+                0.033971530975272196,
+                0.03579716516612644
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.03470719192339717,
+                "50.0" : 0.03474697911961922,
+                "90.0" : 0.035252905931695624,
+                "95.0" : 0.035252905931695624,
+                "99.0" : 0.035252905931695624,
+                "99.9" : 0.035252905931695624,
+                "99.99" : 0.035252905931695624,
+                "99.999" : 0.035252905931695624,
+                "99.9999" : 0.035252905931695624,
+                "100.0" : 0.035252905931695624
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.03470719192339717,
+                    0.03474697911961922,
+                    0.035252905931695624,
+                    0.03472089044661138,
+                    0.034993772932173185
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.00788822710109246,
+            "scoreError" : 3.3391218121107583E-4,
+            "scoreConfidence" : [
+                0.007554314919881384,
+                0.008222139282303536
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.007798893791512052,
+                "50.0" : 0.007901677741125965,
+                "90.0" : 0.008007645933244198,
+                "95.0" : 0.008007645933244198,
+                "99.0" : 0.008007645933244198,
+                "99.9" : 0.008007645933244198,
+                "99.99" : 0.008007645933244198,
+                "99.999" : 0.008007645933244198,
+                "99.9999" : 0.008007645933244198,
+                "100.0" : 0.008007645933244198
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.008007645933244198,
+                    0.007901677741125965,
+                    0.007798893791512052,
+                    0.007808542286111176,
+                    0.007924375753468911
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.13915232150289952,
+            "scoreError" : 0.006225855714044766,
+            "scoreConfidence" : [
+                0.13292646578885475,
+                0.1453781772169443
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.13651878663940015,
+                "50.0" : 0.13961966801506487,
+                "90.0" : 0.14079183070866141,
+                "95.0" : 0.14079183070866141,
+                "99.0" : 0.14079183070866141,
+                "99.9" : 0.14079183070866141,
+                "99.99" : 0.14079183070866141,
+                "99.999" : 0.14079183070866141,
+                "99.9999" : 0.14079183070866141,
+                "100.0" : 0.14079183070866141
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.13651878663940015,
+                    0.13961966801506487,
+                    0.14079183070866141,
+                    0.1399035220125786,
+                    0.1389278001387925
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.033047284794440704,
+            "scoreError" : 0.003808679159014448,
+            "scoreConfidence" : [
+                0.029238605635426254,
+                0.036855963953455154
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.032004526382708204,
+                "50.0" : 0.03335244059618626,
+                "90.0" : 0.034138088947600176,
+                "95.0" : 0.034138088947600176,
+                "99.0" : 0.034138088947600176,
+                "99.9" : 0.034138088947600176,
+                "99.99" : 0.034138088947600176,
+                "99.999" : 0.034138088947600176,
+                "99.9999" : 0.034138088947600176,
+                "100.0" : 0.034138088947600176
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.034138088947600176,
+                    0.033731089625639823,
+                    0.03335244059618626,
+                    0.03201027842006905,
+                    0.032004526382708204
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.5208185288445989,
+            "scoreError" : 0.018947411364328353,
+            "scoreConfidence" : [
+                0.5018711174802706,
+                0.5397659402089272
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.515843609406953,
+                "50.0" : 0.5206605873261205,
+                "90.0" : 0.5285149973780807,
+                "95.0" : 0.5285149973780807,
+                "99.0" : 0.5285149973780807,
+                "99.9" : 0.5285149973780807,
+                "99.99" : 0.5285149973780807,
+                "99.999" : 0.5285149973780807,
+                "99.9999" : 0.5285149973780807,
+                "100.0" : 0.5285149973780807
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.5217221417485773,
+                    0.5285149973780807,
+                    0.5173513083632633,
+                    0.515843609406953,
+                    0.5206605873261205
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.16941684766046336,
+            "scoreError" : 0.0032044058658745006,
+            "scoreConfidence" : [
+                0.16621244179458886,
+                0.17262125352633786
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.16797411412410582,
+                "50.0" : 0.16982666778692657,
+                "90.0" : 0.16999027309507755,
+                "95.0" : 0.16999027309507755,
+                "99.0" : 0.16999027309507755,
+                "99.9" : 0.16999027309507755,
+                "99.99" : 0.16999027309507755,
+                "99.999" : 0.16999027309507755,
+                "99.9999" : 0.16999027309507755,
+                "100.0" : 0.16999027309507755
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.16999027309507755,
+                    0.16943893745796906,
+                    0.16797411412410582,
+                    0.16985424583823777,
+                    0.16982666778692657
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 2.0369793335279924,
+            "scoreError" : 0.047223850672598655,
+            "scoreConfidence" : [
+                1.9897554828553938,
+                2.0842031842005913
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.0171146,
+                "50.0" : 2.038167070707071,
+                "90.0" : 2.0481,
+                "95.0" : 2.0481,
+                "99.0" : 2.0481,
+                "99.9" : 2.0481,
+                "99.99" : 2.0481,
+                "99.999" : 2.0481,
+                "99.9999" : 2.0481,
+                "100.0" : 2.0481
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.0481,
+                    2.038167070707071,
+                    2.0171146,
+                    2.0459234817813767,
+                    2.035591515151515
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.integrate",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 1.0181212606611076,
+            "scoreError" : 0.022543917719312925,
+            "scoreConfidence" : [
+                0.9955773429417947,
+                1.0406651783804206
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.008156143856144,
+                "50.0" : 1.0197394337714865,
+                "90.0" : 1.0233543610547666,
+                "95.0" : 1.0233543610547666,
+                "99.0" : 1.0233543610547666,
+                "99.9" : 1.0233543610547666,
+                "99.99" : 1.0233543610547666,
+                "99.999" : 1.0233543610547666,
+                "99.9999" : 1.0233543610547666,
+                "100.0" : 1.0233543610547666
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.0233543610547666,
+                    1.0197394337714865,
+                    1.0184638469284994,
+                    1.020892517694641,
+                    1.008156143856144
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.004245327554758462,
+            "scoreError" : 2.0057272669556266E-4,
+            "scoreConfidence" : [
+                0.0040447548280629,
+                0.004445900281454025
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.004154001851767275,
+                "50.0" : 0.004258972906917826,
+                "90.0" : 0.004282410270024921,
+                "95.0" : 0.004282410270024921,
+                "99.0" : 0.004282410270024921,
+                "99.9" : 0.004282410270024921,
+                "99.99" : 0.004282410270024921,
+                "99.999" : 0.004282410270024921,
+                "99.9999" : 0.004282410270024921,
+                "100.0" : 0.004282410270024921
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.004154001851767275,
+                    0.004273591586896814,
+                    0.004258972906917826,
+                    0.004282410270024921,
+                    0.004257661158185478
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "64",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.1659867256280038,
+            "scoreError" : 0.008092711296468005,
+            "scoreConfidence" : [
+                0.15789401433153577,
+                0.1740794369244718
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.16406511971138077,
+                "50.0" : 0.1653123348745046,
+                "90.0" : 0.16955316949152544,
+                "95.0" : 0.16955316949152544,
+                "99.0" : 0.16955316949152544,
+                "99.9" : 0.16955316949152544,
+                "99.99" : 0.16955316949152544,
+                "99.999" : 0.16955316949152544,
+                "99.9999" : 0.16955316949152544,
+                "100.0" : 0.16955316949152544
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.16955316949152544,
+                    0.1659076897580378,
+                    0.16406511971138077,
+                    0.1653123348745046,
+                    0.1650953143045702
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.018679654692455493,
+            "scoreError" : 0.0011717442487856067,
+            "scoreConfidence" : [
+                0.017507910443669887,
+                0.019851398941241098
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.018328649708609757,
+                "50.0" : 0.018846101720438203,
+                "90.0" : 0.018973469658743858,
+                "95.0" : 0.018973469658743858,
+                "99.0" : 0.018973469658743858,
+                "99.9" : 0.018973469658743858,
+                "99.99" : 0.018973469658743858,
+                "99.999" : 0.018973469658743858,
+                "99.9999" : 0.018973469658743858,
+                "100.0" : 0.018973469658743858
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.018328649708609757,
+                    0.018372850820003304,
+                    0.018846101720438203,
+                    0.018973469658743858,
+                    0.01887720155448234
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "256",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 0.8275357859708569,
+            "scoreError" : 0.05381773361119678,
+            "scoreConfidence" : [
+                0.7737180523596601,
+                0.8813535195820537
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.812050487012987,
+                "50.0" : 0.8375531380753138,
+                "90.0" : 0.8378862646566164,
+                "95.0" : 0.8378862646566164,
+                "99.0" : 0.8378862646566164,
+                "99.9" : 0.8378862646566164,
+                "99.99" : 0.8378862646566164,
+                "99.999" : 0.8378862646566164,
+                "99.9999" : 0.8378862646566164,
+                "100.0" : 0.8378862646566164
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.812050487012987,
+                    0.8377861204013378,
+                    0.8378862646566164,
+                    0.8124029197080292,
+                    0.8375531380753138
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.0800753603814143,
+            "scoreError" : 0.0073428633257367525,
+            "scoreConfidence" : [
+                0.07273249705567755,
+                0.08741822370715105
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.07671441054729419,
+                "50.0" : 0.0808033034488329,
+                "90.0" : 0.08121619449630652,
+                "95.0" : 0.08121619449630652,
+                "99.0" : 0.08121619449630652,
+                "99.9" : 0.08121619449630652,
+                "99.99" : 0.08121619449630652,
+                "99.999" : 0.08121619449630652,
+                "99.9999" : 0.08121619449630652,
+                "100.0" : 0.08121619449630652
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.07671441054729419,
+                    0.08121619449630652,
+                    0.0808033034488329,
+                    0.0812117494320026,
+                    0.08043114398263526
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "1024",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 3.3614128459308064,
+            "scoreError" : 0.148590619154112,
+            "scoreConfidence" : [
+                3.2128222267766944,
+                3.5100034650849183
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3.307008580858086,
+                "50.0" : 3.379243097643098,
+                "90.0" : 3.4021684745762713,
+                "95.0" : 3.4021684745762713,
+                "99.0" : 3.4021684745762713,
+                "99.9" : 3.4021684745762713,
+                "99.99" : 3.4021684745762713,
+                "99.999" : 3.4021684745762713,
+                "99.9999" : 3.4021684745762713,
+                "100.0" : 3.4021684745762713
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.307008580858086,
+                    3.3368633333333335,
+                    3.3817807432432434,
+                    3.379243097643098,
+                    3.4021684745762713
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 0.32679849229234814,
+            "scoreError" : 0.05880608300209469,
+            "scoreConfidence" : [
+                0.2679924092902535,
+                0.3856045752944428
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.30124879590608067,
+                "50.0" : 0.3357852348993289,
+                "90.0" : 0.3369185521885522,
+                "95.0" : 0.3369185521885522,
+                "99.0" : 0.3369185521885522,
+                "99.9" : 0.3369185521885522,
+                "99.99" : 0.3369185521885522,
+                "99.999" : 0.3369185521885522,
+                "99.9999" : 0.3369185521885522,
+                "100.0" : 0.3369185521885522
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.30124879590608067,
+                    0.3238479793081151,
+                    0.3357852348993289,
+                    0.33619189915966385,
+                    0.3369185521885522
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "4096",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 12.889573519064271,
+            "scoreError" : 0.7736838011504896,
+            "scoreConfidence" : [
+                12.115889717913781,
+                13.663257320214761
+            ],
+            "scorePercentiles" : {
+                "0.0" : 12.56554625,
+                "50.0" : 12.914135897435898,
+                "90.0" : 13.080375324675325,
+                "95.0" : 13.080375324675325,
+                "99.0" : 13.080375324675325,
+                "99.9" : 13.080375324675325,
+                "99.99" : 13.080375324675325,
+                "99.999" : 13.080375324675325,
+                "99.9999" : 13.080375324675325,
+                "100.0" : 13.080375324675325
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    12.56554625,
+                    12.914135897435898,
+                    12.861520512820514,
+                    13.026289610389611,
+                    13.080375324675325
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 1.3491187542116125,
+            "scoreError" : 0.08662861681740476,
+            "scoreConfidence" : [
+                1.2624901373942077,
+                1.4357473710290174
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.3094001308900522,
+                "50.0" : 1.3587510176390774,
+                "90.0" : 1.3639674829931974,
+                "95.0" : 1.3639674829931974,
+                "99.0" : 1.3639674829931974,
+                "99.9" : 1.3639674829931974,
+                "99.99" : 1.3639674829931974,
+                "99.999" : 1.3639674829931974,
+                "99.9999" : 1.3639674829931974,
+                "100.0" : 1.3639674829931974
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.3094001308900522,
+                    1.3537740540540542,
+                    1.3587510176390774,
+                    1.3597010854816824,
+                    1.3639674829931974
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "16384",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 55.62095812865497,
+            "scoreError" : 5.68793096778624,
+            "scoreConfidence" : [
+                49.93302716086873,
+                61.308889096441206
+            ],
+            "scorePercentiles" : {
+                "0.0" : 54.54075263157895,
+                "50.0" : 55.00617368421052,
+                "90.0" : 58.09183888888889,
+                "95.0" : 58.09183888888889,
+                "99.0" : 58.09183888888889,
+                "99.9" : 58.09183888888889,
+                "99.99" : 58.09183888888889,
+                "99.999" : 58.09183888888889,
+                "99.9999" : 58.09183888888889,
+                "100.0" : 58.09183888888889
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    58.09183888888889,
+                    54.54075263157895,
+                    54.609842105263155,
+                    55.856183333333334,
+                    55.00617368421052
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 5.52345515885723,
+            "scoreError" : 0.28129224349452137,
+            "scoreConfidence" : [
+                5.242162915362709,
+                5.804747402351751
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.472455737704918,
+                "50.0" : 5.490493989071038,
+                "90.0" : 5.650170224719101,
+                "95.0" : 5.650170224719101,
+                "99.0" : 5.650170224719101,
+                "99.9" : 5.650170224719101,
+                "99.99" : 5.650170224719101,
+                "99.999" : 5.650170224719101,
+                "99.9999" : 5.650170224719101,
+                "100.0" : 5.650170224719101
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    5.650170224719101,
+                    5.52061923076923,
+                    5.483536612021858,
+                    5.472455737704918,
+                    5.490493989071038
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "65536",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 197.3624273333333,
+            "scoreError" : 13.870942200453023,
+            "scoreConfidence" : [
+                183.49148513288029,
+                211.23336953378632
+            ],
+            "scorePercentiles" : {
+                "0.0" : 194.54635,
+                "50.0" : 195.29935,
+                "90.0" : 203.08422,
+                "95.0" : 203.08422,
+                "99.0" : 203.08422,
+                "99.9" : 203.08422,
+                "99.99" : 203.08422,
+                "99.999" : 203.08422,
+                "99.9999" : 203.08422,
+                "100.0" : 203.08422
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    195.29935,
+                    195.12121666666667,
+                    194.54635,
+                    198.761,
+                    203.08422
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "scalar"
+        },
+        "primaryMetric" : {
+            "score" : 23.716801672203765,
+            "scoreError" : 0.9895714591829324,
+            "scoreConfidence" : [
+                22.72723021302083,
+                24.706373131386698
+            ],
+            "scorePercentiles" : {
+                "0.0" : 23.292651162790698,
+                "50.0" : 23.763576744186047,
+                "90.0" : 23.982378571428573,
+                "95.0" : 23.982378571428573,
+                "99.0" : 23.982378571428573,
+                "99.9" : 23.982378571428573,
+                "99.99" : 23.982378571428573,
+                "99.999" : 23.982378571428573,
+                "99.9999" : 23.982378571428573,
+                "100.0" : 23.982378571428573
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    23.292651162790698,
+                    23.824180952380953,
+                    23.72122093023256,
+                    23.982378571428573,
+                    23.763576744186047
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "com.github.justadeni.displayphysics.sim.KernelBenchmark.terrain",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\graalvm-jdk-25.0.1+8.1\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-modules=jdk.incubator.vector",
+            "-XX:+UseParallelGC"
+        ],
+        "jdkVersion" : "25.0.4.1.1",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.4.1.1+1-LTS-jvmci-25.4-b23",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "count" : "262144",
+            "kernels" : "vector"
+        },
+        "primaryMetric" : {
+            "score" : 1069.71906,
+            "scoreError" : 51.33234987747602,
+            "scoreConfidence" : [
+                1018.3867101225239,
+                1121.0514098774759
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1048.0338,
+                "50.0" : 1072.2679,
+                "90.0" : 1084.4568,
+                "95.0" : 1084.4568,
+                "99.0" : 1084.4568,
+                "99.9" : 1084.4568,
+                "99.99" : 1084.4568,
+                "99.999" : 1084.4568,
+                "99.9999" : 1084.4568,
+                "100.0" : 1084.4568
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1048.0338,
+                    1070.0179,
+                    1084.4568,
+                    1073.8189,
+                    1072.2679
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    }
+]
+
+
