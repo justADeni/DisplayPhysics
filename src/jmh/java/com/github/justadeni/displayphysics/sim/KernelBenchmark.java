@@ -109,4 +109,18 @@ public class KernelBenchmark {
         k.calm(b, 0, count);
     }
 
+    private boolean[] seen;
+    private Sight sight;
+
+    @Benchmark
+    public boolean[] visibility() {
+        if (seen == null) {
+            seen = new boolean[count];
+            float middle = (float) Math.sqrt(count / 0.35) / 2f;
+            sight = new Sight(middle, 12f, -4f, 0f, -0.3f, 0.95f, true, 0.6f, 0.8f, 400f, 1f);
+        }
+        k.visibility(b, 0, count, grid, null, sight, seen);
+        return seen;
+    }
+
 }

@@ -86,3 +86,15 @@ Log (terrain ns/piece, 1 thread on CPU 20, C2, mixed 16384 / resting 16384; scal
 first merge 34.5 / 127.7 (vectors boxed: `floor` helper not inlined, `contact` too big for C2) -> helpers inlined 21.0 / 106.7
 -> contact split in locate/select/derive 19.6 / 99.2 -> two contexts 19.3 / 86.2 -> coupled impulse step 19.3 / 76.4
 -> neighbourhood mask probe + dense candidates 17.3 / 73.3 -> staggered arrays 17.8 / 72.1 -> three contexts 17.0 / 73.4.
+
+## Vectorized visibility (occlusion)
+
+`VectorVisibility`: distance and view-cone tests for a vector of pieces at once, then the lines to the five sample points are
+marched together, one grid sample per step for every lane, with a software byte gather and lane sets kept as `long` bit sets.
+Equivalent to the scalar kernel (`VisibilityTest.vectorKernelsAgree`).
+
+`KernelBenchmark.visibility`, C2, one pinned CPU (ms per call, scalar / vector): 4096 pieces 0.93 / 0.71, 16384: 6.7 / 5.5,
+65536: 38 / 35, 262144: 47 / 90. Only about 1.2x at best: the byte gather is scalar and the lanes of a batch march for as many
+steps as the longest line in it. With pieces in random memory order (this benchmark) distances differ wildly between lanes, hence
+the loss at 262144; the engine keeps pieces in spatial order (periodic reorder), so neighbouring lanes have similar lines there.
+Not pursued further: occlusion runs per viewer at a reduced rate, so it is a small part of a tick.

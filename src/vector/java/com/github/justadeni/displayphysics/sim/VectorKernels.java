@@ -28,6 +28,11 @@ public final class VectorKernels implements Kernels {
     private static final VectorSpecies<Integer> I = IntVector.SPECIES_PREFERRED;
     private static final int L = F.length();
 
+    @Override
+    public void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
+        VectorVisibility.run(b, from, to, grid, occupancy, sight, out);
+    }
+
     /** Pieces per chunk. */
     private static final int CHUNK = 2048;
     private static final int CAP = CHUNK + 2 * L;
