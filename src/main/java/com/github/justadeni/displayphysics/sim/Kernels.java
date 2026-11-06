@@ -34,6 +34,16 @@ public interface Kernels {
         ScalarKernels.lineOfSight(b, from, to, grid, occupancy, sight, out);
     }
 
+    /**
+     * Finds which of the points {@code [from, to)} lie within {@code sqrt(rangeSq)} of (ax, ay, az): their indices are
+     * written to {@code out} (which has room for {@code to - from} plus a few spare entries).
+     *
+     * @return how many were found
+     */
+    default int near(float[] xs, float[] ys, float[] zs, int from, int to, float ax, float ay, float az, float rangeSq, int[] out) {
+        return ScalarKernels.nearScan(xs, ys, zs, from, to, ax, ay, az, rangeSq, out);
+    }
+
     static Kernels scalar() {
         return ScalarKernels.INSTANCE;
     }

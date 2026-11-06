@@ -291,6 +291,8 @@ public final class FlatDebris {
      * searched (the others find the pair from the other side), so each pair is found once.
      */
     // The dense grid's shape, set by sortIntoCells
+    private final int[] runStart = new int[5], runEnd = new int[5];
+    private int[] hits = new int[64];
     private int cellsX, cellsY, cellsZ, occupiedCount;
 
     /**
@@ -378,52 +380,41 @@ public final class FlatDebris {
 
         int nx = cellsX, nz = cellsZ;
         int strideY = nz * nx;
-        var neighbourFrom = new int[13];
-        var neighbourTo = new int[13];
         for (int k = 0; k < occupiedCount; k++) {
             int c = occupied[k];
             int from = cellStart[c], to = cellStart[c + 1];
 
-            // The runs of the 13 neighbours that come after this cell in x, y, z order
-            int neighbours = 0, candidatesPerPiece = to - from;
-            for (int dy = 0; dy <= 1; dy++)
-                for (int dz = -1; dz <= 1; dz++)
-                    for (int dx = -1; dx <= 1; dx++) {
-                        if (dy == 0 && (dz < 0 || (dz == 0 && dx <= 0)))
-                            continue;
-                        int n = c + dy * strideY + dz * nx + dx;
-                        if (cellStart[n] == cellStart[n + 1])
-                            continue;
-                        neighbourFrom[neighbours] = cellStart[n];
-                        neighbourTo[neighbours] = cellStart[n + 1];
-                        candidatesPerPiece += cellStart[n + 1] - cellStart[n];
-                        neighbours++;
-                    }
+            // The cells of one row are contiguous in the sorted order, so each row's three cells form one run
+            int[] rs = runStart, re = runEnd;
+            rs[0] = from; re[0] = cellStart[c + 2];
+            rs[1] = cellStart[c + nx - 1]; re[1] = cellStart[c + nx + 2];
+            rs[2] = cellStart[c + strideY - nx - 1]; re[2] = cellStart[c + strideY - nx + 2];
+            rs[3] = cellStart[c + strideY - 1]; re[3] = cellStart[c + strideY + 2];
+            rs[4] = cellStart[c + strideY + nx - 1]; re[4] = cellStart[c + strideY + nx + 2];
+            int span = 0;
+            for (int r = 0; r < 5; r++)
+                span += re[r] - rs[r];
 
             for (int a = from; a < to; a++) {
-                if (pairCount + candidatesPerPiece > pairA.length) {
-                    int grown = Math.max(pairA.length * 2, pairCount + candidatesPerPiece);
+                if (pairCount + span > pairA.length) {
+                    int grown = Math.max(pairA.length * 2, pairCount + span);
                     pairA = Arrays.copyOf(pairA, grown);
                     pairB = Arrays.copyOf(pairB, grown);
                 }
+                if (hits.length < span + 16)
+                    hits = new int[span + 16];
                 float ax = sortedX[a], ay = sortedY[a], az = sortedZ[a];
                 int slotA = sortedByCell[a];
                 int count = pairCount;
-                // Every candidate is written, and the count only moves on if it is close enough: no unpredictable branch
-                for (int o = a + 1; o < to; o++) {
-                    float dx = sortedX[o] - ax, dy = sortedY[o] - ay, dz = sortedZ[o] - az;
-                    pairA[count] = slotA;
-                    pairB[count] = sortedByCell[o];
-                    count += dx * dx + dy * dy + dz * dz < PAIR_RANGE_SQ ? 1 : 0;
-                }
-                for (int r = 0; r < neighbours; r++)
-                    for (int o = neighbourFrom[r], end = neighbourTo[r]; o < end; o++) {
-                        float dx = sortedX[o] - ax, dy = sortedY[o] - ay, dz = sortedZ[o] - az;
+                for (int r = 0; r < 5; r++) {
+                    int start = r == 0 ? a + 1 : rs[r];
+                    int found = kernels.near(sortedX, sortedY, sortedZ, start, re[r], ax, ay, az, PAIR_RANGE_SQ, hits);
+                    for (int h = 0; h < found; h++) {
                         pairA[count] = slotA;
-                        pairB[count] = sortedByCell[o];
-                        count += dx * dx + dy * dy + dz * dz < PAIR_RANGE_SQ ? 1 : 0;
+                        pairB[count++] = sortedByCell[hits[h]];
                     }
-                candidates += candidatesPerPiece - (a - from);
+                    candidates += re[r] - start;
+                }
                 pairCount = count;
             }
         }

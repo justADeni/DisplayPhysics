@@ -15,6 +15,17 @@ public final class ScalarKernels implements Kernels {
 
     static final ScalarKernels INSTANCE = new ScalarKernels();
 
+    static int nearScan(float[] xs, float[] ys, float[] zs, int from, int to, float ax, float ay, float az, float rangeSq, int[] out) {
+        int count = 0;
+        for (int o = from; o < to; o++) {
+            float dx = xs[o] - ax, dy = ys[o] - ay, dz = zs[o] - az;
+            // Written either way, kept only if close: no unpredictable branch
+            out[count] = o;
+            count += dx * dx + dy * dy + dz * dz < rangeSq ? 1 : 0;
+        }
+        return count;
+    }
+
     private ScalarKernels() {}
 
     @Override
