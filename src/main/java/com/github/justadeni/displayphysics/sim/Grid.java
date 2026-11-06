@@ -32,6 +32,18 @@ public final class Grid {
     private boolean dirty = true;
 
     public byte[] cells = new byte[0];
+    /**
+     * The same voxels as ints (unsigned bytes) for SIMD gathers, which have no byte form; kept in step with
+     * {@link #cells}. Do not write to it.
+     */
+    public int[] wide = new int[0];
+    /**
+     * Per voxel, which of the 27 voxels around it (itself included) are solid with at least one open face: bit
+     * {@code (dx + 1) + 3 * (dy + 1) + 9 * (dz + 1)} for the voxel at offset (dx, dy, dz). Only such voxels can give a
+     * corner a contact, so a SIMD probe reads one entry per piece instead of one per corner, and zero means "nothing
+     * within one voxel". It is kept conservative: filling sets it, {@link #markResting} only ever adds bits.
+     */
+    public int[] nbr = new int[0];
     /** The lowest covered voxel and the extent of the box, in voxels. */
     public int x0, y0, z0, sx, sy, sz;
 
@@ -93,7 +105,56 @@ public final class Grid {
         addOpenFaces();
         for (int k = 0; k < resting.size(); k += 3)
             setSolid(resting.getInt(k), resting.getInt(k + 1), resting.getInt(k + 2));
+        if (wide.length != cells.length) {
+            wide = new int[cells.length];
+            nbr = new int[cells.length];
+        } else {
+            Arrays.fill(nbr, 0);
+        }
+        boolean anyLiquid = false;
+        for (int k = 0; k < cells.length; k++) {
+            wide[k] = cells[k] & 0xFF;
+            anyLiquid |= (cells[k] & TYPE_MASK) == LIQUID;
+        }
+        liquid = anyLiquid;
+        markExposed();
         dirty = false;
+    }
+
+    /** Whether any covered voxel is liquid (so the SIMD forces kernel can skip the buoyancy lookup when not). */
+    public boolean liquid;
+
+    /** The int view for gathers (see {@link #wide}). */
+    public int[] wide() {
+        return wide;
+    }
+
+    private void markExposed() {
+        int strideZ = sx, strideY = sx * sz;
+        for (int y = 0; y < sy; y++)
+            for (int z = 0; z < sz; z++) {
+                int row = y * strideY + z * strideZ;
+                for (int x = 0; x < sx; x++)
+                    if ((cells[row + x] & 0xFC) != 0)
+                        markExposed(x, y, z);
+            }
+    }
+
+    /** Tells the 27 voxels around the exposed solid voxel (grid-relative x, y, z) about it. */
+    private void markExposed(int x, int y, int z) {
+        for (int dy = -1; dy <= 1; dy++) {
+            if (y + dy < 0 || y + dy >= sy)
+                continue;
+            for (int dz = -1; dz <= 1; dz++) {
+                if (z + dz < 0 || z + dz >= sz)
+                    continue;
+                int row = (y + dy) * sx * sz + (z + dz) * sx;
+                for (int dx = -1; dx <= 1; dx++)
+                    if (x + dx >= 0 && x + dx < sx)
+                        // From the neighbour's point of view the solid voxel is at offset (-dx, -dy, -dz)
+                        nbr[row + x + dx] |= 1 << ((1 - dx) + 3 * (1 - dy) + 9 * (1 - dz));
+            }
+        }
     }
 
     /** Fills in the face bits of every solid voxel. Outside the box counts as open. */
@@ -149,6 +210,14 @@ public final class Grid {
         if (z == z0 + sz - 1 || (cells[i + strideZ] & TYPE_MASK) != SOLID) open |= OPEN_PZ; else cells[i + strideZ] &= (byte) ~OPEN_NZ;
         if (z == z0 || (cells[i - strideZ] & TYPE_MASK) != SOLID) open |= OPEN_NZ; else cells[i - strideZ] &= (byte) ~OPEN_PZ;
         cells[i] = (byte) (SOLID | open);
+        if (wide.length == cells.length) {
+            wide[i] = cells[i] & 0xFF;
+            for (int j : new int[]{i + 1, i - 1, i + strideY, i - strideY, i + strideZ, i - strideZ})
+                if (j >= 0 && j < cells.length)
+                    wide[j] = cells[j] & 0xFF;
+            if ((cells[i] & 0xFC) != 0)
+                markExposed(x - x0, y - y0, z - z0);
+        }
     }
 
     public static int floor(float v) {
