@@ -70,6 +70,7 @@ public final class DisplayPhysics {
      * moves until {@link Assembly#simulate}. On Folia call it from the thread that owns the pieces'
      * region.
      *
+     * @param world  the world, or {@code null} to take it from the first block or location (pieces alone need it)
      * @param things {@link Piece}s, {@link Block}s or {@link Location}s, in any list or set. A block or location
      *               becomes a hard piece of mass 1 with the block's current {@code BlockData}; read them on the thread
      *               that owns them.
@@ -81,14 +82,22 @@ public final class DisplayPhysics {
         for (Object thing : things) {
             switch (thing) {
                 case Piece piece -> pieces.add(piece);
-                case Block block -> pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
+                case Block block -> {
+                    if (world == null)
+                        world = block.getWorld();
+                    pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
+                }
                 case Location location -> {
                     Block block = location.getBlock();
+                    if (world == null)
+                        world = block.getWorld();
                     pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
                 }
                 default -> throw new IllegalArgumentException("Expected Piece, Block or Location, got " + thing);
             }
         }
+        if (world == null)
+            throw new IllegalArgumentException("A world is needed when the assembly holds only pieces");
         return new Assembly(logger, platform, world, pieces, viewers);
     }
 

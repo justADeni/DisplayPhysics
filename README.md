@@ -50,7 +50,7 @@ Blast.at(location, 4f)                   // same, from a Location
 ## Creating an assembly
 
 `assemble(world, things, viewers)` takes a `List` or `Set` of `Block`, `Location` or `Piece`. Blocks and locations become
-hard pieces of mass 1; build `Piece`s yourself for soft pieces, other masses or glow.
+hard pieces of mass 1, and `world` may then be `null`. Build `Piece`s yourself (with a `world`) for soft pieces, other masses or glow.
 
 ## Types
 
