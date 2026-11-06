@@ -79,3 +79,23 @@ loaded where that API exists), so it is safe on Folia. Wait for `assembly.spawne
 the real blocks.
 
 The physics (`sim` package) has no Bukkit dependency and is covered by headless tests: `./gradlew test`.
+
+## Performance
+
+The engine (`sim.FlatDebris`) keeps every piece in flat arrays (structure of arrays), searches for touching
+pairs with a counting-sorted cell grid, and probes the terrain through a dense one-byte-per-voxel grid.
+Roughly 90 ms per tick for 10,000 pieces all moving, about 1 s for 100,000 (single thread).
+
+With `--add-modules jdk.incubator.vector` the terrain, force, integration and line-of-sight kernels use the
+Vector API (`FloatVector.SPECIES_PREFERRED`, so the widest hardware vectors, with masks for tails). Without
+it the scalar kernels give identical results, only slower: `Settings.simd(false)` forces them too. Terrain
+contacts are 3-7x faster, forces and integration 4-9x. Benchmarks: `./gradlew jmh`
+(`-Pbench=KernelBenchmark`, `-Pkernels=scalar|vector`); results and what was tried in `EXPERIMENTS.md`.
+Run the server with C2 (HotSpot's default); the Graal JIT compiles the vector code far worse.
+
+## Occlusion culling
+
+`Settings.occlusion(...)` stops sending a piece to a player who cannot see it: too far away, outside the view
+cone (the look direction plus a 110 degree field of view, the worst case in Minecraft), or behind terrain or
+other simulated pieces. It is decided per player, a few times a second, by marching lines to five points of each
+piece through the terrain grid, and only changes what is sent, never the simulation.
