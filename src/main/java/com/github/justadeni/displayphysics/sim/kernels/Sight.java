@@ -1,4 +1,4 @@
-package com.github.justadeni.displayphysics.sim;
+package com.github.justadeni.displayphysics.sim.kernels;
 
 /**
  * One viewer's eye, relative to the simulation's origin, and what they can see.

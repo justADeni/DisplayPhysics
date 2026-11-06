@@ -20,63 +20,39 @@ repositories {
     maven { url = uri("https://repo.papermc.io/repository/maven-public/") }
 }
 
-// Code that needs Paper/Folia-only API (regionized schedulers) lives in its own source set, compiled
-// against paper-api and packed into the same jar. It is only loaded when the server has that API.
-val paper: SourceSet by sourceSets.creating {
-    compileClasspath += sourceSets.main.get().output
-}
-
-// The SIMD kernels use the incubating Vector API, which needs --add-modules jdk.incubator.vector. They live in
-// their own source set so the rest of the library neither compiles against nor loads that module; the jar
-// carries them, and they are only instantiated when the running JVM has the module.
-val vector: SourceSet by sourceSets.creating {
-    compileClasspath += sourceSets.main.get().output
-}
-
 val vectorModule = "--add-modules=jdk.incubator.vector"
 
 dependencies {
-    "paperCompileOnly"("io.papermc.paper:paper-api:26.1.2.build.+")
-    "paperCompileOnly"("it.unimi.dsi:fastutil:8.5.15")
-
-    // Compiled against Spigot's API so nothing Paper-only can slip in. The server provides JOML and fastutil.
-    compileOnly("org.spigotmc:spigot-api:26.1.2-R0.1-SNAPSHOT")
+    // The server provides the API, JOML and fastutil. Only RegionizedPlatform touches Paper-only API, and it is
+    // loaded by name where that API exists.
+    compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
     compileOnly("it.unimi.dsi:fastutil:8.5.15")
 
-    testImplementation("org.spigotmc:spigot-api:26.1.2-R0.1-SNAPSHOT")
+    testImplementation("io.papermc.paper:paper-api:26.1.2.build.+")
     testImplementation("it.unimi.dsi:fastutil:8.5.15")
     testImplementation(platform("org.junit:junit-bom:5.11.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation(vector.output)
 
-    // Benchmarks run against the same classes the tests do, plus the vector kernels
-    jmhImplementation("org.spigotmc:spigot-api:26.1.2-R0.1-SNAPSHOT")
+    // Benchmarks run against the same classes the tests do
+    jmhImplementation("io.papermc.paper:paper-api:26.1.2.build.+")
     jmhImplementation("it.unimi.dsi:fastutil:8.5.15")
-    jmhImplementation(vector.output)
 }
 
 tasks {
-    jar {
-        from(paper.output)
-        from(vector.output)
-    }
-    named<Jar>("sourcesJar") {
-        from(paper.allSource)
-        from(vector.allSource)
-    }
     compileJava {
-        options.release = 25
-    }
-    named<JavaCompile>("compileVectorJava") {
-        // --release and --add-modules can't be combined, so this one compiles against the toolchain's own JDK
+        // The SIMD kernels use the incubating Vector API. --release can't be combined with --add-modules, so the
+        // toolchain's own JDK is the target. They only load when the running JVM has the module.
         options.compilerArgs.add(vectorModule)
     }
     named<JavaCompile>("compileJmhJava") {
         options.compilerArgs.add(vectorModule)
     }
     javadoc {
-        (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
+        (options as StandardJavadocDocletOptions).apply {
+            addStringOption("Xdoclint:none", "-quiet")
+            addStringOption("-add-modules", "jdk.incubator.vector")
+        }
     }
     test {
         useJUnitPlatform()

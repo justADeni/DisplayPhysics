@@ -6,7 +6,7 @@ public sealed interface Mode {
     /** One solid unit until it comes to rest. */
     Rigid RIGID = new Rigid();
 
-    /** No solid stage at all: separate bodies from the first tick that simply collapse. */
+    /** No solid stage: the pieces are separate bodies from the first tick and collapse. */
     FallApart FALL_APART = new FallApart();
 
     /** A solid unit that shatters when it hits something solid at {@code speed} blocks per second. */

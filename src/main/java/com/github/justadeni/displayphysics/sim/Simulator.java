@@ -1,4 +1,6 @@
 package com.github.justadeni.displayphysics.sim;
+import com.github.justadeni.displayphysics.sim.kernels.Sight;
+import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 
 import com.github.justadeni.displayphysics.Blast;
 import com.github.justadeni.displayphysics.Hinge;

@@ -1,9 +1,11 @@
 package com.github.justadeni.displayphysics;
 
+import com.github.justadeni.displayphysics.sim.kernels.Sight;
+import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 import com.github.justadeni.displayphysics.sim.Bodies;
 import com.github.justadeni.displayphysics.sim.FlatDebris;
-import com.github.justadeni.displayphysics.sim.Kernels;
-import com.github.justadeni.displayphysics.sim.Sight;
+import com.github.justadeni.displayphysics.sim.kernels.Kernels;
+import com.github.justadeni.displayphysics.sim.kernels.Sight;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 

@@ -1,4 +1,7 @@
-package com.github.justadeni.displayphysics.sim;
+package com.github.justadeni.displayphysics.sim.kernels;
+
+import com.github.justadeni.displayphysics.sim.Bodies;
+import com.github.justadeni.displayphysics.sim.Grid;
 
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.IntVector;

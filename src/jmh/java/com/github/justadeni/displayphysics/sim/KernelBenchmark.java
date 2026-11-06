@@ -1,4 +1,6 @@
 package com.github.justadeni.displayphysics.sim;
+import com.github.justadeni.displayphysics.sim.kernels.Sight;
+import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 
 import org.openjdk.jmh.annotations.*;
 
@@ -81,7 +83,7 @@ public class KernelBenchmark {
 
     private static Kernels load(String variant) {
         try {
-            String name = "com.github.justadeni.displayphysics.sim.VectorKernels" + Character.toUpperCase(variant.charAt(0)) + variant.substring(1);
+            String name = "com.github.justadeni.displayphysics.sim.kernels.VectorKernels" + Character.toUpperCase(variant.charAt(0)) + variant.substring(1);
             return (Kernels) Class.forName(name).getDeclaredConstructor().newInstance();
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);

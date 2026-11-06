@@ -1,4 +1,7 @@
-package com.github.justadeni.displayphysics.sim;
+package com.github.justadeni.displayphysics.sim.kernels;
+
+import com.github.justadeni.displayphysics.sim.Bodies;
+import com.github.justadeni.displayphysics.sim.Grid;
 
 /**
  * The per-piece passes of a debris tick, each over a range of awake slots. They are independent per
@@ -73,7 +76,7 @@ public interface Kernels {
             if (ModuleLayer.boot().findModule("jdk.incubator.vector").isEmpty())
                 return null;
             try {
-                return (Kernels) Class.forName("com.github.justadeni.displayphysics.sim.VectorKernels")
+                return (Kernels) Class.forName("com.github.justadeni.displayphysics.sim.kernels.VectorKernels")
                         .getDeclaredConstructor().newInstance();
             } catch (ReflectiveOperationException | LinkageError e) {
                 return null;
