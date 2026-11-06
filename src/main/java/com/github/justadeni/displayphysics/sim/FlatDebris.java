@@ -39,6 +39,9 @@ public final class FlatDebris {
 
     private final Bodies b;
     private final Grid grid;
+    /** Below this many awake pieces the scalar terrain kernel is faster than the SIMD one (measured around 100). */
+    private static final int SIMD_TERRAIN_MIN = 100;
+
     private final Kernels kernels;
     private final float gravity, friction, softBounciness;
 
@@ -214,7 +217,7 @@ public final class FlatDebris {
             solvePairs(true);
             solvePairs(false);
             t = lap(3, t);
-            kernels.terrain(b, 0, awake, grid, dt);
+            (awake < SIMD_TERRAIN_MIN ? Kernels.scalar() : kernels).terrain(b, 0, awake, grid, dt);
             t = lap(4, t);
             kernels.integrate(b, 0, awake, dt);
             t = lap(5, t);
