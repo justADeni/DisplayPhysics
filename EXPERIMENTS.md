@@ -1,8 +1,13 @@
-# SIMD kernel notes
+# Performance notes
 
-The goal was a `VectorKernels` (Vector API) at least 2x faster than `ScalarKernels` on the `terrain` kernel at some batch
-size, and not slower anywhere that matters, then the same gain in the whole engine (`FlatDebrisBenchmark`). The final
-kernel reaches 3-7x on terrain. This file records what the kernels do and what was tried.
+The engine (`sim.FlatDebris`) keeps pieces in flat arrays, finds touching pairs with a counting-sorted cell grid and
+probes terrain through a dense one-byte-per-voxel grid: about 90 ms per tick for 10,000 moving pieces, about 1 s for
+100,000 (single thread). The SIMD kernels in `sim.kernels` run the terrain, force, integration and line-of-sight
+passes 3-9x faster than `ScalarKernels`; without the Vector API the scalar kernels give the same results.
+
+`Occlusion` (via `Settings.occlusion`) is decided per player a few times a second. It marches lines to five points of each
+piece through the terrain grid and only changes what is sent, never the simulation. The view cone uses the vertical FOV,
+the window's aspect ratio and a margin.
 
 ## Layout
 
