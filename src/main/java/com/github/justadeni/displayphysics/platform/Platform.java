@@ -1,6 +1,8 @@
 package com.github.justadeni.displayphysics.platform;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -18,6 +20,9 @@ public interface Platform {
      */
     CompletableFuture<Location> locate(Player player);
 
+    /** Runs the task on the thread that owns the block column (x, z) of the world. */
+    void runAt(World world, int blockX, int blockZ, Runnable task);
+
     /** The implementation for this server. The regionized one is only loaded where its API exists. */
     static Platform detect(Plugin plugin) {
         try {
@@ -25,12 +30,27 @@ public interface Platform {
             return (Platform) Class.forName("com.github.justadeni.displayphysics.platform.RegionizedPlatform")
                     .getConstructor(Plugin.class).newInstance(plugin);
         } catch (ReflectiveOperationException | LinkageError e) {
-            return new BukkitPlatform();
+            return new BukkitPlatform(plugin);
         }
     }
 
     /** Plain Bukkit/Spigot: one main thread, entities are readable right away. */
     final class BukkitPlatform implements Platform {
+
+        private final Plugin plugin;
+
+        BukkitPlatform(Plugin plugin) {
+            this.plugin = plugin;
+        }
+
+        @Override
+        public void runAt(World world, int blockX, int blockZ, Runnable task) {
+            if (Bukkit.isPrimaryThread())
+                task.run();
+            else
+                Bukkit.getScheduler().runTask(plugin, task);
+        }
+
         @Override
         public CompletableFuture<Location> locate(Player player) {
             try {

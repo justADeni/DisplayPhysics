@@ -8,10 +8,10 @@ Works on Spigot, Paper and Folia 26.1 and newer. Check `DisplayPhysics.isSupport
 ```java
 DisplayPhysics physics = DisplayPhysics.create(plugin);
 
-// 1. Spawn the displays for the viewers. Remove the real blocks once spawned() completes.
-Assembly assembly = physics.assemble(world, pieces, Viewers.nearby());
+// 1. Spawn the displays for the viewers, from blocks, locations or your own pieces.
+Assembly assembly = physics.assembleBlocks(blocks, Viewers.nearby());
 
-// 2. Let it go. Runs off the main thread.
+// 2. Let it go. The real blocks are removed when it starts, and it runs off the main thread.
 var settings = new Settings().mode(Mode.explode(Blast.at(x, y, z, 4f)));
 assembly.simulate(null, settings, terrain, listener).thenAccept(result -> {
     for (int i = 0; i < result.count(); i++) {
@@ -47,6 +47,14 @@ Blast.at(location, 4f)                   // same, from a Location
     .remainder(Blast.Remainder.FALL)     // pieces out of reach drop; STAY (default) keeps them in place
 ```
 
+## Creating an assembly
+
+| Method | Input |
+|--------|-------|
+| `assembleBlocks(blocks, viewers)` | any `Collection<Block>` (`List`, `Set`), each a hard piece of mass 1 |
+| `assembleLocations(locations, viewers)` | any `Collection<Location>`, same defaults |
+| `assemble(world, pieces, viewers)` | a `List<Piece>`, when you want soft pieces, other masses or glow |
+
 ## Types
 
 | Type | Role |
@@ -69,6 +77,7 @@ new Settings()
     .friction(0.6f)
     .bounciness(0.25f)
     .maxDuration(30f)                  // seconds before the simulation stops
+    .removeBlocks(true)                // (default) remove the real blocks when the simulation starts
     .occlusion(Occlusion.standard())   // skip pieces a player cannot see
     .simd(true);                       // use the Vector API when the JVM has it
 ```

@@ -3,8 +3,12 @@ package com.github.justadeni.displayphysics;
 import com.github.justadeni.displayphysics.net.Packets;
 import com.github.justadeni.displayphysics.platform.Platform;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -70,6 +74,31 @@ public final class DisplayPhysics {
         if (pieces.isEmpty())
             throw new IllegalArgumentException("An assembly needs at least one piece");
         return new Assembly(logger, platform, world, pieces, viewers);
+    }
+
+    /**
+     * Like {@link #assemble}, with one piece per block: its current {@code BlockData}, hard, mass 1. All blocks
+     * must be in the same world. Read the blocks on the thread that owns them.
+     */
+    public Assembly assembleBlocks(Collection<? extends Block> blocks, Viewers viewers) {
+        if (blocks.isEmpty())
+            throw new IllegalArgumentException("An assembly needs at least one piece");
+        List<Piece> pieces = new ArrayList<>(blocks.size());
+        World world = null;
+        for (Block block : blocks) {
+            if (world == null)
+                world = block.getWorld();
+            pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
+        }
+        return assemble(world, pieces, viewers);
+    }
+
+    /** Like {@link #assembleBlocks}, for the blocks at these locations (all in the same world). */
+    public Assembly assembleLocations(Collection<? extends Location> locations, Viewers viewers) {
+        List<Block> blocks = new ArrayList<>(locations.size());
+        for (Location location : locations)
+            blocks.add(location.getBlock());
+        return assembleBlocks(blocks, viewers);
     }
 
     static void later(Runnable task, long millis) {

@@ -5,12 +5,14 @@ import com.github.justadeni.displayphysics.platform.Platform;
 import org.bukkit.Bukkit;
 import com.github.justadeni.displayphysics.sim.Simulator;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,8 +26,8 @@ import java.util.concurrent.locks.LockSupport;
 /**
  * A group of blocks shown as packet-only block displays and treated as one solid unit.
  *
- * <p>Creating it spawns the displays for the viewers right away (so the host can remove the real
- * blocks a tick later without a gap). {@link #simulate} then lets it fall; the displays are sent
+ * <p>Creating it spawns the displays for the viewers right away (so the real
+ * blocks can be removed afterwards without a gap; {@link Settings#removeBlocks} does that when the simulation starts). {@link #simulate} then lets it fall; the displays are sent
  * their poses straight from the simulation thread, bundled so every client applies a frame at
  * once. They stay where they ended up until {@link #release()}.
  *
@@ -150,12 +152,30 @@ public final class Assembly {
         CompletableFuture<Result> future = new CompletableFuture<>();
         Thread.ofVirtual().name("DisplayPhysics").start(() -> {
             try {
+                if (settings.removeBlocks) {
+                    spawned.join(); // the displays are up, so removing the blocks leaves no gap
+                    removeBlocks();
+                }
                 future.complete(run(hinge, settings, terrain, listener));
             } catch (Throwable t) {
                 future.completeExceptionally(t);
             }
         });
         return future;
+    }
+
+    /** Sets the real blocks to air, one task per chunk on the thread that owns it. */
+    private void removeBlocks() {
+        Map<Long, List<Piece>> byChunk = new HashMap<>();
+        for (Piece piece : pieces)
+            byChunk.computeIfAbsent(((long) (piece.x() >> 4) << 32) | ((piece.z() >> 4) & 0xFFFFFFFFL), k -> new ArrayList<>()).add(piece);
+        for (List<Piece> group : byChunk.values()) {
+            Piece first = group.get(0);
+            platform.runAt(world, first.x(), first.z(), () -> {
+                for (Piece piece : group)
+                    world.getBlockAt(piece.x(), piece.y(), piece.z()).setType(Material.AIR, false);
+            });
+        }
     }
 
     /** Removes the displays from every client and stops a running simulation. Safe to call twice. */

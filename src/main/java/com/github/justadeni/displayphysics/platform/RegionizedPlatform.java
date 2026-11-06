@@ -2,6 +2,7 @@ package com.github.justadeni.displayphysics.platform;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -14,6 +15,11 @@ public final class RegionizedPlatform implements Platform {
 
     public RegionizedPlatform(Plugin plugin) {
         this.plugin = plugin;
+    }
+
+    @Override
+    public void runAt(World world, int blockX, int blockZ, Runnable task) {
+        Bukkit.getRegionScheduler().run(plugin, world, blockX >> 4, blockZ >> 4, scheduled -> task.run());
     }
 
     @Override
