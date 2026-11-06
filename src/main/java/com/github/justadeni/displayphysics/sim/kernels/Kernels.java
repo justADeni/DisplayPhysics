@@ -1,6 +1,7 @@
 package com.github.justadeni.displayphysics.sim.kernels;
 
 import com.github.justadeni.displayphysics.sim.Bodies;
+import com.github.justadeni.displayphysics.sim.Coarse;
 import com.github.justadeni.displayphysics.sim.Grid;
 
 public interface Kernels {
@@ -14,8 +15,8 @@ public interface Kernels {
 
     void calm(Bodies b, int from, int to);
 
-    default void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
-        ScalarKernels.lineOfSight(b, from, to, grid, occupancy, sight, out);
+    default void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, Coarse coarse, Sight sight, boolean[] out) {
+        ScalarKernels.lineOfSight(b, from, to, grid, occupancy, coarse, sight, out);
     }
 
     default int near(float[] xs, float[] ys, float[] zs, int from, int to, float ax, float ay, float az, float rangeSq, int[] out) {

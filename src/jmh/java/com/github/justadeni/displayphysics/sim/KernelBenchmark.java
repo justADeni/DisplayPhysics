@@ -18,6 +18,9 @@ public class KernelBenchmark {
     @Param({"mixed", "flying", "resting"})
     public String scene;
 
+    @Param({"flat"})
+    public String terrain;
+
     @Param({"scalar", "vector"})
     public String kernels;
 
@@ -61,7 +64,7 @@ public class KernelBenchmark {
                 b.vx[i] *= 0.05f; b.vy[i] *= 0.05f; b.vz[i] *= 0.05f; b.wx[i] *= 0.05f; b.wy[i] *= 0.05f; b.wz[i] *= 0.05f;
             }
         }
-        grid = new Grid(Scenario.FLAT, Scenario.ORIGIN_X, Scenario.ORIGIN_Y, Scenario.ORIGIN_Z);
+        grid = new Grid(switch (terrain) { case "forest" -> Scenario.FOREST; case "hills" -> Scenario.HILLS; default -> Scenario.FLAT; }, Scenario.ORIGIN_X, Scenario.ORIGIN_Y, Scenario.ORIGIN_Z);
         int s = (int) side + 8;
         grid.ensure(-6, -6, -6, s, 12, s);
     }
@@ -104,14 +107,25 @@ public class KernelBenchmark {
     private boolean[] seen;
     private Sight sight;
 
-    @Benchmark
-    public boolean[] visibility() {
+    private void prepareSight() {
         if (seen == null) {
             seen = new boolean[count];
             float middle = (float) Math.sqrt(count / 0.35) / 2f;
             sight = new Sight(middle, 12f, -4f, 0f, -0.3f, 0.95f, true, 0.6f, 0.8f, 400f, 1f);
         }
-        k.visibility(b, 0, count, grid, null, sight, seen);
+    }
+
+    @Benchmark
+    public boolean[] visibility() {
+        prepareSight();
+        k.visibility(b, 0, count, grid, null, grid.coarse, sight, seen);
+        return seen;
+    }
+
+    @Benchmark
+    public boolean[] visibilityFlat() {
+        prepareSight();
+        k.visibility(b, 0, count, grid, null, null, sight, seen);
         return seen;
     }
 }

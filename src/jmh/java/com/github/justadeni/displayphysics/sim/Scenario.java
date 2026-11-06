@@ -25,6 +25,27 @@ public final class Scenario {
         }
     };
 
+    public static final TerrainSource FOREST = new TerrainSource() {
+        public byte classify(int x, int y, int z) {
+            if (y < 64)
+                return SOLID;
+            int h = (x * 73856093) ^ (z * 19349663);
+            h ^= h >>> 13;
+            return (h & 15) == 0 && y < 64 + 2 + ((h >>> 8) & 15) ? SOLID : AIR;
+        }
+        public int minY() { return -64; }
+        public int maxY() { return 320; }
+    };
+
+    public static final TerrainSource HILLS = new TerrainSource() {
+        public byte classify(int x, int y, int z) {
+            double height = 64 + 6 * Math.sin(x / 17.0) + 6 * Math.cos(z / 23.0) + 3 * Math.sin((x + z) / 7.0);
+            return y < height ? SOLID : AIR;
+        }
+        public int minY() { return -64; }
+        public int maxY() { return 320; }
+    };
+
     public static final int ORIGIN_X = 0, ORIGIN_Y = 64, ORIGIN_Z = 0;
 
     public record Cloud(float[] x, float[] y, float[] z, float[] vx, float[] vy, float[] vz, boolean[] hard) {

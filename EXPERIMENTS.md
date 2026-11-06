@@ -93,22 +93,40 @@ Terrain ns/piece, 1 thread on CPU 20, C2, mixed 16384 / resting 16384 (scalar: 6
 | staggered arrays | 17.8 / 72.1 |
 | three contexts | 17.0 / 73.4 |
 
-## Vectorised visibility (occlusion)
+## Occlusion
 
-`VectorVisibility` runs the distance and view-cone tests for a vector of pieces at once. It then marches the lines to the
-five sample points together, one grid sample per step for every lane, with a software byte gather and lane sets kept as
-`long` bit sets. It matches the scalar kernel (`VisibilityTest.vectorKernelsAgree`).
+Each piece is tested in three steps: distance, view cone, then lines from the eye to five sample points, marched through the
+terrain grid at a fixed spacing. The first two are cheap and run 16 pieces at a time in `VectorVisibility`. The marching
+dominates, and it is where the time went.
 
-`KernelBenchmark.visibility` on C2 and one pinned CPU, in ms per call (scalar / vector):
+The first SIMD version marched all lanes of a vector in lockstep, one grid sample per step. It was only about 1.2x faster
+than scalar, because the byte gather is scalar and every lane runs as long as the longest line in the batch.
 
-| Pieces | Scalar | Vector |
-|--------|--------|--------|
-| 4096 | 0.93 | 0.71 |
-| 16384 | 6.7 | 5.5 |
-| 65536 | 38 | 35 |
-| 262144 | 47 | 90 |
+The current version borrows from hierarchical occlusion culling (Hasselgren et al., "Masked Software Occlusion Culling",
+and the depth-pyramid techniques in the Umbra overview): a coarse level holds a conservative bound, and a query that
+passes it skips the detail. `Coarse` keeps, for 16x16 and 64x64 footprints of the grid, the highest voxel that can block.
+A sample above that height is clear for the rest of the footprint, so the line jumps to where it leaves the footprint or
+drops to that height. The samples that are still taken are the same ones as before, so the result is identical
+(`VisibilityTest.skippingClearSpaceChangesNothing` checks scalar and SIMD against marching without it, with and without
+pieces occluding). Moving pieces are added to a copy of the levels for the call.
 
-The gain is about 1.2x at best. The byte gather is scalar, and the lanes of a batch march for as many steps as the longest
-line in it. The benchmark keeps pieces in random memory order, so lane distances differ wildly, which explains the loss
-at 262144. The engine keeps pieces in spatial order (periodic reorder), so neighbouring lanes have similar lines there.
-It was not pursued further: occlusion runs per viewer at a reduced rate and is a small part of a tick.
+`KernelBenchmark.visibility` against `visibilityFlat` (the same kernel without the pyramid), 16384 pieces, one pinned
+thread, microseconds per call. `-Pterrain` is flat, hills (sine surface, about 15 blocks of relief) or forest (one pillar
+in 16 columns, up to 17 high):
+
+| Terrain | Marching every sample | With the pyramid |
+|---------|-----------------------|------------------|
+| flat | 6710 | 1340 |
+| hills | 17300 | 12300 |
+| forest | 11500 | 11700 |
+
+Things that did not pay off:
+
+- A 4x4 column level and an 8x8x8 brick level (empty-brick skipping). Consulting them costs about as much as the 3 to 4
+  samples they skip, and they were 2x slower than no skipping at all on the forest.
+- Skipping inside the SIMD march. Each lane needs its own scalar exit computation, which made it 1.6 to 1.8x slower than the
+  scalar march on hills and forest. The SIMD kernel now only does the distance and cone tests and hands the survivors to
+  the scalar march.
+- Failed skip attempts back off (1, 2, 4 ... 16 samples before the next try) so rough terrain does not pay for them on every
+  sample. Rough terrain whose pillars set every footprint's maximum high, like the forest, gains nothing and stays within
+  about 2% of marching every sample, but a SIMD march without the pyramid was about 10% faster there.

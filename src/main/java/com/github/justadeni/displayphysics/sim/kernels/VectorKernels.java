@@ -1,6 +1,7 @@
 package com.github.justadeni.displayphysics.sim.kernels;
 
 import com.github.justadeni.displayphysics.sim.Bodies;
+import com.github.justadeni.displayphysics.sim.Coarse;
 import com.github.justadeni.displayphysics.sim.Grid;
 
 import jdk.incubator.vector.FloatVector;
@@ -19,8 +20,8 @@ public final class VectorKernels implements Kernels {
     private static final int L = F.length();
 
     @Override
-    public void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
-        VectorVisibility.run(b, from, to, grid, occupancy, sight, out);
+    public void visibility(Bodies b, int from, int to, Grid grid, byte[] occupancy, Coarse coarse, Sight sight, boolean[] out) {
+        VectorVisibility.run(b, from, to, grid, occupancy, coarse, sight, out);
     }
 
     private static final int CHUNK = 2048;

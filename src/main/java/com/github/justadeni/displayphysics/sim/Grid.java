@@ -21,6 +21,8 @@ public final class Grid {
     public int[] nbr = new int[0];
     public int x0, y0, z0, sx, sy, sz;
 
+    public final Coarse coarse = new Coarse();
+
     public Grid(TerrainSource source, int ox, int oy, int oz) {
         this.source = source;
         this.ox = ox;
@@ -73,8 +75,10 @@ public final class Grid {
                     cells[index++] = source.classify(x + ox, worldY, z + oz);
         }
         addOpenFaces();
+        coarse.reset(sx, sy, sz);
         for (int k = 0; k < resting.size(); k += 3)
             setSolid(resting.getInt(k), resting.getInt(k + 1), resting.getInt(k + 2));
+        buildCoarse();
         if (wide.length != cells.length) {
             wide = new int[cells.length];
             nbr = new int[cells.length];
@@ -92,6 +96,17 @@ public final class Grid {
     }
 
     public boolean liquid;
+
+    private void buildCoarse() {
+        coarse.reset(sx, sy, sz);
+        for (int y = 0; y < sy; y++)
+            for (int z = 0; z < sz; z++) {
+                int row = (y * sz + z) * sx;
+                for (int x = 0; x < sx; x++)
+                    if ((cells[row + x] & TYPE_MASK) == SOLID)
+                        coarse.mark(x, y, z);
+            }
+    }
 
     public int[] wide() {
         return wide;
@@ -172,6 +187,8 @@ public final class Grid {
         if (z == z0 + sz - 1 || (cells[i + strideZ] & TYPE_MASK) != SOLID) open |= OPEN_PZ; else cells[i + strideZ] &= (byte) ~OPEN_NZ;
         if (z == z0 || (cells[i - strideZ] & TYPE_MASK) != SOLID) open |= OPEN_NZ; else cells[i - strideZ] &= (byte) ~OPEN_PZ;
         cells[i] = (byte) (SOLID | open);
+        if (!coarse.isEmpty())
+            coarse.mark(x - x0, y - y0, z - z0);
         if (wide.length == cells.length) {
             wide[i] = cells[i] & 0xFF;
             for (int j : new int[]{i + 1, i - 1, i + strideY, i - strideY, i + strideZ, i - strideZ})

@@ -1,15 +1,17 @@
 package com.github.justadeni.displayphysics;
 
-import com.github.justadeni.displayphysics.sim.kernels.Sight;
-import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 import com.github.justadeni.displayphysics.sim.Bodies;
+import com.github.justadeni.displayphysics.sim.Coarse;
 import com.github.justadeni.displayphysics.sim.FlatDebris;
+import com.github.justadeni.displayphysics.sim.Grid;
 import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 import com.github.justadeni.displayphysics.sim.kernels.Sight;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Random;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -137,5 +139,67 @@ class VisibilityTest {
             var plug = plugAndTarget();
             assertArrayEquals(visible(OPEN, plug, Kernels.scalar(), true, sight(1f, cone)), visible(OPEN, plug, vector, true, sight(1f, cone)));
         }
+    }
+
+    private static final TerrainSource FOREST = new TerrainSource() {
+        public byte classify(int x, int y, int z) {
+            if (y < 64)
+                return SOLID;
+            int h = (x * 73856093) ^ (z * 19349663);
+            h ^= h >>> 13;
+            return (h & 15) == 0 && y < 64 + 2 + ((h >>> 8) & 15) ? SOLID : AIR;
+        }
+        public int minY() { return -64; }
+        public int maxY() { return 320; }
+    };
+
+    @Test
+    void skippingClearSpaceChangesNothing() {
+        var random = new Random(7);
+        int count = 700;
+        var bodies = new Bodies(count);
+        for (int i = 0; i < count; i++) {
+            bodies.px[i] = random.nextFloat() * 120f - 60f;
+            bodies.py[i] = 1f + random.nextFloat() * 20f;
+            bodies.pz[i] = random.nextFloat() * 120f - 60f;
+        }
+        var grid = new Grid(FOREST, 0, 64, 0);
+        grid.ensure(-70, -3, -70, 70, 30, 70);
+
+        var occupancy = new byte[grid.cells.length];
+        var coarse = new Coarse();
+        coarse.copyFrom(grid.coarse);
+        for (int i = 0; i < count; i++) {
+            int x = Grid.floor(bodies.px[i]), y = Grid.floor(bodies.py[i]), z = Grid.floor(bodies.pz[i]);
+            occupancy[grid.index(x, y, z)]++;
+            coarse.mark(x - grid.x0, y - grid.y0, z - grid.z0);
+        }
+
+        var kernels = new ArrayList<Kernels>(List.of(Kernels.scalar()));
+        if (Kernels.vector() != null)
+            kernels.add(Kernels.vector());
+        double half = Occlusion.standard().coneHalfAngle();
+        float[][] eyes = {{-50, 2, -50, 1, 0, 0}, {0, 8, 0, 0, 0, 1}, {40, 1.6f, -30, -0.7f, 0.1f, 0.7f}, {-60, 15, 55, 0.6f, -0.3f, -0.74f}};
+        int hidden = 0, shown = 0;
+        for (var e : eyes)
+            for (boolean cone : new boolean[]{false, true})
+                for (float spacing : new float[]{0.6f, 1f}) {
+                    float norm = (float) Math.sqrt(e[3] * e[3] + e[4] * e[4] + e[5] * e[5]);
+                    var sight = new Sight(e[0], e[1], e[2], e[3] / norm, e[4] / norm, e[5] / norm, cone, (float) Math.cos(half), (float) Math.sin(half), 96f, spacing);
+                    var expected = new boolean[count];
+                    Kernels.scalar().visibility(bodies, 0, count, grid, null, null, sight, expected);
+                    var expectedPieces = new boolean[count];
+                    Kernels.scalar().visibility(bodies, 0, count, grid, occupancy, null, sight, expectedPieces);
+                    for (boolean v : expected) { if (v) shown++; else hidden++; }
+                    for (var k : kernels) {
+                        var terrainOnly = new boolean[count];
+                        k.visibility(bodies, 0, count, grid, null, grid.coarse, sight, terrainOnly);
+                        assertArrayEquals(expected, terrainOnly, k.name() + " terrain, cone=" + cone + " spacing=" + spacing);
+                        var withPieces = new boolean[count];
+                        k.visibility(bodies, 0, count, grid, occupancy, coarse, sight, withPieces);
+                        assertArrayEquals(expectedPieces, withPieces, k.name() + " pieces, cone=" + cone + " spacing=" + spacing);
+                    }
+                }
+        assertTrue(hidden > 100 && shown > 100, "the scene should hide and show plenty (hidden " + hidden + ", shown " + shown + ")");
     }
 }

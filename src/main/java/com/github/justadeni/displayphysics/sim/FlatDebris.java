@@ -117,13 +117,15 @@ public final class FlatDebris {
 
     private boolean[] visibleBySlot = new boolean[0];
     private byte[] occupancy = new byte[0];
+    private final Coarse coarse = new Coarse();
 
     public void visibility(Sight sight, boolean piecesOcclude, boolean[] visibleByPiece) {
         int awake = b.awake;
         if (visibleBySlot.length < awake)
             visibleBySlot = new boolean[b.capacity];
         if (awake > 0) {
-            kernels.visibility(b, 0, awake, grid, piecesOcclude ? occupancyOfMovingPieces(awake) : null, sight, visibleBySlot);
+            byte[] occupied = piecesOcclude ? occupancyOfMovingPieces(awake) : null;
+            kernels.visibility(b, 0, awake, grid, occupied, occupied != null ? coarse : grid.coarse, sight, visibleBySlot);
         }
         for (int s = 0; s < awake; s++)
             visibleByPiece[b.id[s]] = visibleBySlot[s];
@@ -136,12 +138,14 @@ public final class FlatDebris {
             occupancy = new byte[grid.cells.length];
         else
             Arrays.fill(occupancy, (byte) 0);
+        coarse.copyFrom(grid.coarse);
         for (int s = 0; s < awake; s++) {
             int x = Grid.floor(b.px[s]), y = Grid.floor(b.py[s]), z = Grid.floor(b.pz[s]);
             if (x >= grid.x0 && x < grid.x0 + grid.sx && y >= grid.y0 && y < grid.y0 + grid.sy && z >= grid.z0 && z < grid.z0 + grid.sz) {
                 int index = grid.index(x, y, z);
                 if (occupancy[index] < Byte.MAX_VALUE)
                     occupancy[index]++;
+                coarse.mark(x - grid.x0, y - grid.y0, z - grid.z0);
             }
         }
         return occupancy;

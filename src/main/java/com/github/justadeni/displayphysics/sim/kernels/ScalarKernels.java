@@ -1,6 +1,7 @@
 package com.github.justadeni.displayphysics.sim.kernels;
 
 import com.github.justadeni.displayphysics.sim.Bodies;
+import com.github.justadeni.displayphysics.sim.Coarse;
 import com.github.justadeni.displayphysics.sim.Grid;
 
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
@@ -216,16 +217,15 @@ public final class ScalarKernels implements Kernels {
 
     static final float[] SIGHT_POINTS = {0f, 0f, 0f, .4f, .4f, .4f, -.4f, .4f, -.4f, .4f, -.4f, -.4f, -.4f, -.4f, .4f};
 
+    static final int MAX_SKIP_WAIT = 16;
     static final float SELF_CLEARANCE = 0.8f;
 
-    static void lineOfSight(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
-        float ex = sight.ex(), ey = sight.ey(), ez = sight.ez(), spacing = sight.spacing();
+    static void lineOfSight(Bodies b, int from, int to, Grid grid, byte[] occupancy, Coarse coarse, Sight sight, boolean[] out) {
+        float ex = sight.ex(), ey = sight.ey(), ez = sight.ez();
         float maxSquared = sight.maxDistance() * sight.maxDistance();
         float nearSquared = Sight.NEAR * Sight.NEAR;
-        byte[] cells = grid.cells;
         for (int i = from; i < to; i++) {
-            float cx = b.px[i], cy = b.py[i], cz = b.pz[i];
-            float dx = cx - ex, dy = cy - ey, dz = cz - ez;
+            float dx = b.px[i] - ex, dy = b.py[i] - ey, dz = b.pz[i] - ez;
             float distanceSquared = dx * dx + dy * dy + dz * dz;
             if (distanceSquared > maxSquared) {
                 out[i] = false;
@@ -239,28 +239,48 @@ public final class ScalarKernels implements Kernels {
                 out[i] = false;
                 continue;
             }
-
-            boolean seen = false;
-            for (int point = 0; point < 5 && !seen; point++) {
-                float rx = cx + SIGHT_POINTS[3 * point] - ex, ry = cy + SIGHT_POINTS[3 * point + 1] - ey, rz = cz + SIGHT_POINTS[3 * point + 2] - ez;
-                float length = (float) Math.sqrt(rx * rx + ry * ry + rz * rz);
-                int steps = Math.max(1, (int) Math.ceil(length / spacing));
-                float inverse = 1f / steps;
-
-                boolean blocked = false;
-                for (int s = 0; s < steps && !blocked; s++) {
-                    float f = (s + 0.5f) * inverse;
-                    int x = Grid.floor(ex + rx * f), y = Grid.floor(ey + ry * f), z = Grid.floor(ez + rz * f);
-                    if (x >= grid.x0 && x < grid.x0 + grid.sx && y >= grid.y0 && y < grid.y0 + grid.sy && z >= grid.z0 && z < grid.z0 + grid.sz) {
-                        int index = grid.index(x, y, z);
-                        blocked = (cells[index] & Grid.TYPE_MASK) == Grid.SOLID
-                                || (occupancy != null && occupancy[index] != 0 && (1f - f) * length > SELF_CLEARANCE);
-                    }
-                }
-                seen = !blocked;
-            }
-            out[i] = seen;
+            out[i] = clearLine(b.px[i], b.py[i], b.pz[i], grid, occupancy, coarse, sight);
         }
+    }
+
+    /** Whether a line from the eye to any of the piece's five sample points runs through no blocker. */
+    static boolean clearLine(float cx, float cy, float cz, Grid grid, byte[] occupancy, Coarse coarse, Sight sight) {
+        float ex = sight.ex(), ey = sight.ey(), ez = sight.ez(), spacing = sight.spacing();
+        byte[] cells = grid.cells;
+        for (int point = 0; point < 5; point++) {
+            float rx = cx + SIGHT_POINTS[3 * point] - ex, ry = cy + SIGHT_POINTS[3 * point + 1] - ey, rz = cz + SIGHT_POINTS[3 * point + 2] - ez;
+            float length = (float) Math.sqrt(rx * rx + ry * ry + rz * rz);
+            int steps = Math.max(1, (int) Math.ceil(length / spacing));
+            float inverse = 1f / steps;
+            float ix = rx != 0f ? 1f / rx : 0f, iy = ry != 0f ? 1f / ry : 0f, iz = rz != 0f ? 1f / rz : 0f;
+
+            boolean blocked = false;
+            int tryAt = 0, wait = 1;
+            for (int s = 0; s < steps && !blocked; s++) {
+                float f = (s + 0.5f) * inverse;
+                int x = Grid.floor(ex + rx * f), y = Grid.floor(ey + ry * f), z = Grid.floor(ez + rz * f);
+                if (x >= grid.x0 && x < grid.x0 + grid.sx && y >= grid.y0 && y < grid.y0 + grid.sy && z >= grid.z0 && z < grid.z0 + grid.sz) {
+                    if (coarse != null && s >= tryAt) {
+                        int next = coarse.skipTo(x - grid.x0, y - grid.y0, z - grid.z0, ex - grid.x0, ey - grid.y0, ez - grid.z0,
+                                rx, ry, rz, ix, iy, iz, length, steps);
+                        if (next > s) {
+                            s = next - 1;
+                            wait = 1;
+                            tryAt = next;
+                            continue;
+                        }
+                        tryAt = s + wait;
+                        wait = Math.min(wait * 2, MAX_SKIP_WAIT);
+                    }
+                    int index = grid.index(x, y, z);
+                    blocked = (cells[index] & Grid.TYPE_MASK) == Grid.SOLID
+                            || (occupancy != null && occupancy[index] != 0 && (1f - f) * length > SELF_CLEARANCE);
+                }
+            }
+            if (!blocked)
+                return true;
+        }
+        return false;
     }
 
     @Override
