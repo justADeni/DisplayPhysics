@@ -6,8 +6,9 @@ You describe the blocks, the ground and how they should start moving. The librar
 solid body or as separate pieces, sends every frame straight from its own thread (bundled, so all
 clients apply a frame together), and hands back where each piece came to rest.
 
-Supports Spigot, Paper and Folia 26.1, 26.2, 26.3 and newer (servers using Mojang's class names). Only
-the Bukkit API is used; the sole server-internal access is building and sending the packets.
+Supports Spigot, Paper and Folia 26.1, 26.2, 26.3 and newer (servers using Mojang's class names). The code
+uses the Bukkit API, plus Paper's entity scheduler where it exists. The only server-internal access is
+building and sending the packets.
 `DisplayPhysics.isSupported()` tells you whether the current server can be used.
 
 ```java
@@ -33,7 +34,7 @@ assembly.simulate(null, settings, terrain, listener).thenAccept(result -> {
 |--------|-----------|
 | `Mode.RIGID` | one solid body that falls, bounces, slides and rolls until it rests |
 | `Mode.breakOnImpact(speed)` | solid until it hits something faster than `speed`, then every piece scatters |
-| `Mode.FALL_APART` | no solid stage: separate pieces from the first tick that simply collapse |
+| `Mode.FALL_APART` | no solid stage: the pieces are separate bodies from the first tick and collapse |
 | `Mode.explode(blast)` | pieces are thrown apart by a `Blast` |
 
 A `Hinge` gives the solid modes a start like a door swinging open: tip over an edge, then let go.
@@ -82,13 +83,15 @@ The physics (`sim` package) has no Bukkit dependency and is covered by headless 
 
 ## Performance
 
-The engine (`sim.FlatDebris`) keeps every piece in flat arrays (structure of arrays), searches for touching
-pairs with a counting-sorted cell grid, and probes the terrain through a dense one-byte-per-voxel grid.
+The engine (`sim.FlatDebris`) keeps every piece in flat arrays (structure of arrays), finds touching pairs
+with a counting-sorted cell grid, and probes the terrain through a dense one-byte-per-voxel grid.
 Roughly 90 ms per tick for 10,000 pieces all moving, about 1 s for 100,000 (single thread).
 
-With `--add-modules jdk.incubator.vector` the terrain, force, integration and line-of-sight kernels use the
-Vector API (`FloatVector.SPECIES_PREFERRED`, so the widest hardware vectors, with masks for tails). Without
-it the scalar kernels give identical results, only slower: `Settings.simd(false)` forces them too. Terrain
+The per-piece kernels live in `sim.kernels`: `ScalarKernels` is the reference, `VectorKernels` and
+`VectorVisibility` are the SIMD versions. With `--add-modules jdk.incubator.vector` the terrain, force,
+integration and line-of-sight kernels use the Vector API (`FloatVector.SPECIES_PREFERRED`, so the widest
+hardware vectors, with masks for tails). Without it the scalar kernels give the same results more slowly;
+`Settings.simd(false)` forces them too. Terrain
 contacts are 3-7x faster, forces and integration 4-9x. Benchmarks: `./gradlew jmh`
 (`-Pbench=KernelBenchmark`, `-Pkernels=scalar|vector`); results and what was tried in `EXPERIMENTS.md`.
 Run the server with C2 (HotSpot's default); the Graal JIT compiles the vector code far worse.
@@ -98,4 +101,4 @@ Run the server with C2 (HotSpot's default); the Graal JIT compiles the vector co
 `Settings.occlusion(...)` stops sending a piece to a player who cannot see it: too far away, outside the view
 cone (the look direction plus a 110 degree field of view, the worst case in Minecraft), or behind terrain or
 other simulated pieces. It is decided per player, a few times a second, by marching lines to five points of each
-piece through the terrain grid, and only changes what is sent, never the simulation.
+piece through the terrain grid. It changes what is sent, never the simulation.
