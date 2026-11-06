@@ -12,8 +12,7 @@ import org.bukkit.block.Block;
  * x and z from {@value #MIN_XZ} to {@value #MAX_XZ} and y from {@value #MIN_Y} to {@value #MAX_Y},
  * which holds every position in a world (coordinates outside those ranges wrap around).
  *
- * <p>The constants {@link #X}, {@link #Y} and {@link #Z} select a coordinate for {@link #get};
- * the per-axis {@link #x}, {@link #y} and {@link #z} do the same without a switch.
+ * <p>The constants {@link #X}, {@link #Y} and {@link #Z} select a coordinate for {@link #get}.
  */
 public enum XYZ {
     X,
@@ -38,36 +37,23 @@ public enum XYZ {
 
     public static int get(XYZ coordinate, long packed) {
         return switch (coordinate) {
-            case X -> x(packed);
-            case Y -> y(packed);
-            case Z -> z(packed);
+            case X -> (int) (packed << 1 >> 37);
+            case Y -> (int) (packed >> 27 & Y_MASK) + MIN_Y;
+            case Z -> (int) (packed << 37 >> 37);
         };
-    }
-
-    /** The x coordinate, sign-extended from its 27 bits (bit 63 of the key is never set, so shift it into place first). */
-    public static int x(long packed) {
-        return (int) (packed << 1 >> 37);
-    }
-
-    public static int y(long packed) {
-        return (int) (packed >> 27 & Y_MASK) + MIN_Y;
-    }
-
-    public static int z(long packed) {
-        return (int) (packed << 37 >> 37);
     }
 
     /** The position as a new {@link Location}, decoding all three coordinates in one go. */
     public static Location location(World world, long packed) {
-        return new Location(world, x(packed), y(packed), z(packed));
+        return new Location(world, (int) (packed << 1 >> 37), (int) (packed >> 27 & Y_MASK) + MIN_Y, (int) (packed << 37 >> 37));
     }
 
     public static Block block(World world, long packed) {
-        return world.getBlockAt(x(packed), y(packed), z(packed));
+        return world.getBlockAt((int) (packed << 1 >> 37), (int) (packed >> 27 & Y_MASK) + MIN_Y, (int) (packed << 37 >> 37));
     }
 
     /** The position moved by {@code dx, dy, dz}. */
     public static long offset(long packed, int dx, int dy, int dz) {
-        return pack(x(packed) + dx, y(packed) + dy, z(packed) + dz);
+        return pack((int) (packed << 1 >> 37) + dx, (int) (packed >> 27 & Y_MASK) + MIN_Y + dy, (int) (packed << 37 >> 37) + dz);
     }
 }

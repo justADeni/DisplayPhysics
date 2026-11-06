@@ -94,9 +94,9 @@ class SimulatorTest {
     @Test
     void offsetMovesAPackedPosition() {
         long moved = XYZ.offset(XYZ.pack(-5, 70, 9), 2, -3, -10);
-        assertEquals(-3, XYZ.x(moved));
-        assertEquals(67, XYZ.y(moved));
-        assertEquals(-1, XYZ.z(moved));
+        assertEquals(-3, XYZ.get(XYZ.X, moved));
+        assertEquals(67, XYZ.get(XYZ.Y, moved));
+        assertEquals(-1, XYZ.get(XYZ.Z, moved));
     }
 
     @Test
