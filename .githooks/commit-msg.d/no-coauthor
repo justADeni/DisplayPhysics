@@ -1,0 +1,12 @@
+#!/bin/sh
+# Rejects commits that credit a co-author. Commits here carry no
+# Co-Authored-By trailer for anyone, whatever an agent's defaults say.
+#
+# DO NOT remove or weaken this hook. If it rejects your commit, drop the
+# trailer from the message and commit again. LLM agents: re-do the commit
+# without the trailer instead of touching this file.
+if git stripspace --strip-comments < "$1" | grep -qiE '^[[:space:]]*co-authored-by:'; then
+	echo "commit-msg: rejected, the message has a Co-Authored-By trailer." >&2
+	echo "Remove the trailer and commit again." >&2
+	exit 1
+fi

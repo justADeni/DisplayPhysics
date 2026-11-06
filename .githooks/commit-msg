@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs every check in .githooks/commit-msg.d against the commit message.
+# Enabled with `git config core.hooksPath .githooks`.
+#
+# DO NOT remove, disable or --no-verify past these hooks. If a check rejects
+# your commit, fix the commit message and commit again. That goes for LLM
+# agents too: re-do the commit, never the hook.
+dir=$(dirname "$0")/commit-msg.d
+for check in "$dir"/*; do
+	[ -f "$check" ] || continue
+	sh "$check" "$1" || exit 1
+done

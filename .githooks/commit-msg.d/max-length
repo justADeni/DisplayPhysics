@@ -1,0 +1,15 @@
+#!/bin/sh
+# Rejects commit messages longer than 100 characters. Messages here are one
+# short line starting with a past-tense verb (added/fixed/made x).
+#
+# DO NOT remove or raise this limit. If it rejects your commit, shorten the
+# message and commit again. LLM agents: re-do the commit with a shorter
+# message instead of touching this file.
+max=100
+msg=$(git stripspace --strip-comments < "$1")
+len=$(printf '%s' "$msg" | wc -m | tr -d ' ')
+if [ "$len" -gt "$max" ]; then
+	echo "commit-msg: rejected, the message is $len characters (max $max)." >&2
+	echo "Shorten it to one line and commit again." >&2
+	exit 1
+fi
