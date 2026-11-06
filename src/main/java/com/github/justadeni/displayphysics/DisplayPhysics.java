@@ -68,37 +68,28 @@ public final class DisplayPhysics {
     /**
      * Spawns the pieces as displays for the viewers and groups them into one assembly. Nothing
      * moves until {@link Assembly#simulate}. On Folia call it from the thread that owns the pieces'
-     * region, and wait for {@link Assembly#spawned()} before removing the real blocks.
+     * region.
+     *
+     * @param things {@link Piece}s, {@link Block}s or {@link Location}s, in any list or set. A block or location
+     *               becomes a hard piece of mass 1 with the block's current {@code BlockData}; read them on the thread
+     *               that owns them.
      */
-    public Assembly assemble(World world, List<Piece> pieces, Viewers viewers) {
-        if (pieces.isEmpty())
+    public Assembly assemble(World world, Collection<?> things, Viewers viewers) {
+        if (things.isEmpty())
             throw new IllegalArgumentException("An assembly needs at least one piece");
-        return new Assembly(logger, platform, world, pieces, viewers);
-    }
-
-    /**
-     * Like {@link #assemble}, with one piece per block: its current {@code BlockData}, hard, mass 1. All blocks
-     * must be in the same world. Read the blocks on the thread that owns them.
-     */
-    public Assembly assembleBlocks(Collection<? extends Block> blocks, Viewers viewers) {
-        if (blocks.isEmpty())
-            throw new IllegalArgumentException("An assembly needs at least one piece");
-        List<Piece> pieces = new ArrayList<>(blocks.size());
-        World world = null;
-        for (Block block : blocks) {
-            if (world == null)
-                world = block.getWorld();
-            pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
+        List<Piece> pieces = new ArrayList<>(things.size());
+        for (Object thing : things) {
+            switch (thing) {
+                case Piece piece -> pieces.add(piece);
+                case Block block -> pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
+                case Location location -> {
+                    Block block = location.getBlock();
+                    pieces.add(new Piece(block.getX(), block.getY(), block.getZ(), block.getBlockData(), true, 1f));
+                }
+                default -> throw new IllegalArgumentException("Expected Piece, Block or Location, got " + thing);
+            }
         }
-        return assemble(world, pieces, viewers);
-    }
-
-    /** Like {@link #assembleBlocks}, for the blocks at these locations (all in the same world). */
-    public Assembly assembleLocations(Collection<? extends Location> locations, Viewers viewers) {
-        List<Block> blocks = new ArrayList<>(locations.size());
-        for (Location location : locations)
-            blocks.add(location.getBlock());
-        return assembleBlocks(blocks, viewers);
+        return new Assembly(logger, platform, world, pieces, viewers);
     }
 
     static void later(Runnable task, long millis) {

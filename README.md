@@ -8,8 +8,8 @@ Works on Spigot, Paper and Folia 26.1 and newer. Check `DisplayPhysics.isSupport
 ```java
 DisplayPhysics physics = DisplayPhysics.create(plugin);
 
-// 1. Spawn the displays for the viewers, from blocks, locations or your own pieces.
-Assembly assembly = physics.assembleBlocks(blocks, Viewers.nearby());
+// 1. Spawn the displays for the viewers, from a list or set of blocks, locations or pieces.
+Assembly assembly = physics.assemble(world, blocks, Viewers.nearby());
 
 // 2. Let it go. The real blocks are removed when it starts, and it runs off the main thread.
 var settings = new Settings().mode(Mode.explode(Blast.at(x, y, z, 4f)));
@@ -49,11 +49,8 @@ Blast.at(location, 4f)                   // same, from a Location
 
 ## Creating an assembly
 
-| Method | Input |
-|--------|-------|
-| `assembleBlocks(blocks, viewers)` | any `Collection<Block>` (`List`, `Set`), each a hard piece of mass 1 |
-| `assembleLocations(locations, viewers)` | any `Collection<Location>`, same defaults |
-| `assemble(world, pieces, viewers)` | a `List<Piece>`, when you want soft pieces, other masses or glow |
+`assemble(world, things, viewers)` takes a `List` or `Set` of `Block`, `Location` or `Piece`. Blocks and locations become
+hard pieces of mass 1; build `Piece`s yourself for soft pieces, other masses or glow.
 
 ## Types
 
