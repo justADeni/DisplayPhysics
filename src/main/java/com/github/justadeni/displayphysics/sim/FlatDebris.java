@@ -36,7 +36,18 @@ public final class FlatDebris {
     private final Kernels kernels;
     private final float gravity, friction, softBounciness;
 
+    /** Above this many pair-search cells the pieces are too spread out for a dense grid and a hash map is used. */
+    private static final int MAX_DENSE_CELLS = 1 << 22;
+    /** The limit in use; lowered by tests and benchmarks to compare the two pair searches. */
+    public static int denseCellLimit = MAX_DENSE_CELLS;
+
     private final Long2IntOpenHashMap cells = new Long2IntOpenHashMap();
+    // Dense pair search: pieces counting-sorted by cell, so each cell's pieces are one contiguous run
+    private int[] cellStart = new int[0];
+    private int[] cellCursor = new int[0];
+    private final int[] inCell;
+    private final int[] sortedByCell;
+    private int[] occupied = new int[256];
     private final int[] cellNext;
     private final float[] builtX, builtY, builtZ;
     private int[] pairA = new int[1024], pairB = new int[1024];
@@ -50,6 +61,8 @@ public final class FlatDebris {
         this.friction = friction;
         this.softBounciness = softBounciness;
         this.cellNext = new int[bodies.capacity];
+        this.inCell = new int[bodies.capacity];
+        this.sortedByCell = new int[bodies.capacity];
         this.builtX = new float[bodies.capacity];
         this.builtY = new float[bodies.capacity];
         this.builtZ = new float[bodies.capacity];
@@ -155,30 +168,51 @@ public final class FlatDebris {
 
     // ── Stepping ─────────────────────────────────────────────────────────────
 
+    /** Where the time of a tick goes, in nanoseconds summed over all ticks, by stage: see {@link #STAGES}. */
+    public final long[] stageNanos = new long[8];
+    public static final String[] STAGES = {"grid", "pair search", "forces", "pair solve", "terrain", "integrate", "calm + sleep", "total"};
+
     /** Advances one tick; returns whether every piece has come to rest. */
     public boolean step() {
         int awake = b.awake;
         if (awake == 0)
             return true;
 
+        long start = System.nanoTime(), t = start;
         prepareGrid(awake);
         Arrays.fill(b.touch, 0, awake, 0f);
+        t = lap(0, t);
         buildPairs(awake);
+        t = lap(1, t);
 
         float dt = TICK / SUBSTEPS;
         for (int s = 0; s < SUBSTEPS; s++) {
             kernels.forces(b, 0, awake, grid, dt, gravity);
+            t = lap(2, t);
             // Pieces push each other apart first, so the terrain pass gets the last word and nothing is left shoved into the ground
             if (s > 0 && movedTooFar(awake))
                 buildPairs(awake);
+            t = lap(1, t);
             solvePairs(true);
             solvePairs(false);
+            t = lap(3, t);
             kernels.terrain(b, 0, awake, grid, dt);
+            t = lap(4, t);
             kernels.integrate(b, 0, awake, dt);
+            t = lap(5, t);
         }
+        rescueBuried(awake);
         kernels.calm(b, 0, awake);
         sweepSleepers();
+        t = lap(6, t);
+        stageNanos[7] += t - start;
         return b.awake == 0;
+    }
+
+    private long lap(int stage, long since) {
+        long now = System.nanoTime();
+        stageNanos[stage] += now - since;
+        return now;
     }
 
     /** Makes the terrain grid cover wherever the awake pieces can reach this tick. */
@@ -192,6 +226,30 @@ public final class FlatDebris {
         }
         grid.ensure(Grid.floor(minX) - GRID_MARGIN, Grid.floor(minY) - GRID_MARGIN, Grid.floor(minZ) - GRID_MARGIN,
                 Grid.floor(maxX) + GRID_MARGIN, Grid.floor(maxY) + GRID_MARGIN, Grid.floor(maxZ) + GRID_MARGIN);
+    }
+
+    /**
+     * A piece shoved deep into the terrain has no open face to be pushed out of, so the contacts ignore it and it
+     * would fall through the ground for ever. Such a piece is lifted to the first open voxel above it.
+     */
+    private void rescueBuried(int awake) {
+        int top = grid.y0 + grid.sy;
+        for (int i = 0; i < awake; i++) {
+            int x = Grid.floor(b.px[i]), y = Grid.floor(b.py[i]), z = Grid.floor(b.pz[i]);
+            if (x < grid.x0 || x >= grid.x0 + grid.sx || y < grid.y0 || y >= top || z < grid.z0 || z >= grid.z0 + grid.sz)
+                continue;
+            int cell = grid.cell(x, y, z);
+            if ((cell & Grid.TYPE_MASK) != Grid.SOLID || (cell & ~Grid.TYPE_MASK) != 0)
+                continue; // in the open, or in a solid voxel it can still be pushed out of
+            int free = y;
+            while (free < top && (grid.cell(x, free, z) & Grid.TYPE_MASK) == Grid.SOLID)
+                free++;
+            if (free >= top)
+                continue;
+            b.py[i] = free + 0.5f;
+            if (b.vy[i] < 0f)
+                b.vy[i] = 0f;
+        }
     }
 
     /** Moves pieces that stayed calm long enough out of the active range, as solid ground. */
@@ -212,21 +270,90 @@ public final class FlatDebris {
     }
 
     /**
-     * Lists every pair of awake pieces close enough to touch soon. Only half of the neighbouring cells are
+     * Lists every pair of awake pieces close enough to touch soon. The pieces are counting-sorted into a dense
+     * grid of cells (no hashing, one contiguous run of pieces per cell); only half of the neighbouring cells are
      * searched (the others find the pair from the other side), so each pair is found once.
      */
     private void buildPairs(int awake) {
+        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+        for (int i = 0; i < awake; i++) {
+            minX = Math.min(minX, b.px[i]); maxX = Math.max(maxX, b.px[i]);
+            minY = Math.min(minY, b.py[i]); maxY = Math.max(maxY, b.py[i]);
+            minZ = Math.min(minZ, b.pz[i]); maxZ = Math.max(maxZ, b.pz[i]);
+            builtX[i] = b.px[i];
+            builtY[i] = b.py[i];
+            builtZ[i] = b.pz[i];
+        }
+        // One empty cell of margin on every side, so neighbour cells never fall off the grid
+        int nx = (int) ((maxX - minX) / CELL) + 3, ny = (int) ((maxY - minY) / CELL) + 3, nz = (int) ((maxZ - minZ) / CELL) + 3;
+        long total = (long) nx * ny * nz;
+        pairCount = 0;
+        if (total > denseCellLimit) {
+            buildPairsHashed(awake);
+            return;
+        }
+
+        int size = (int) total;
+        if (cellStart.length < size + 1) {
+            cellStart = new int[size + 1];
+            cellCursor = new int[size + 1];
+        } else {
+            Arrays.fill(cellStart, 0, size + 1, 0);
+        }
+
+        int occupiedCount = 0;
+        for (int i = 0; i < awake; i++) {
+            int cx = (int) ((b.px[i] - minX) / CELL) + 1, cy = (int) ((b.py[i] - minY) / CELL) + 1, cz = (int) ((b.pz[i] - minZ) / CELL) + 1;
+            int c = (cy * nz + cz) * nx + cx;
+            inCell[i] = c;
+            if (cellStart[c + 1]++ == 0) {
+                if (occupiedCount == occupied.length)
+                    occupied = Arrays.copyOf(occupied, occupiedCount * 2);
+                occupied[occupiedCount++] = c;
+            }
+        }
+        // Prefix sums turn the counts into where each cell's run starts
+        for (int c = 0; c < size; c++)
+            cellStart[c + 1] += cellStart[c];
+        System.arraycopy(cellStart, 0, cellCursor, 0, size);
+        for (int i = 0; i < awake; i++)
+            sortedByCell[cellCursor[inCell[i]]++] = i;
+
+        int strideY = nz * nx;
+        for (int k = 0; k < occupiedCount; k++) {
+            int c = occupied[k];
+            int from = cellStart[c], to = cellStart[c + 1];
+            for (int a = from; a < to; a++)
+                for (int o = a + 1; o < to; o++)
+                    addPair(sortedByCell[a], sortedByCell[o]);
+
+            // The 13 neighbours that come after this cell in x, y, z order
+            for (int dy = 0; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++) {
+                        if (dy == 0 && (dz < 0 || (dz == 0 && dx <= 0)))
+                            continue;
+                        int n = c + dy * strideY + dz * nx + dx;
+                        int nFrom = cellStart[n], nTo = cellStart[n + 1];
+                        if (nFrom == nTo)
+                            continue;
+                        for (int a = from; a < to; a++)
+                            for (int o = nFrom; o < nTo; o++)
+                                addPair(sortedByCell[a], sortedByCell[o]);
+                    }
+        }
+    }
+
+    /** The pair search for pieces too spread out for a dense grid: a hash map from cell to the pieces in it. */
+    private void buildPairsHashed(int awake) {
         cells.clear();
         for (int i = 0; i < awake; i++) {
             long key = key(cell(b.px[i]), cell(b.py[i]), cell(b.pz[i]));
             cellNext[i] = cells.get(key);
             cells.put(key, i);
-            builtX[i] = b.px[i];
-            builtY[i] = b.py[i];
-            builtZ[i] = b.pz[i];
         }
 
-        pairCount = 0;
         for (int i = 0; i < awake; i++) {
             int cx = cell(b.px[i]), cy = cell(b.py[i]), cz = cell(b.pz[i]);
             // Own cell: only the pieces after this one. Then the 13 neighbouring cells that come after it in x, y, z order.
