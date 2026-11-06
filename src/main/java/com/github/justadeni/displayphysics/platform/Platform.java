@@ -1,6 +1,5 @@
 package com.github.justadeni.displayphysics.platform;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -31,33 +30,6 @@ public interface Platform {
                     .getConstructor(Plugin.class).newInstance(plugin);
         } catch (ReflectiveOperationException | LinkageError e) {
             return new BukkitPlatform(plugin);
-        }
-    }
-
-    /** Plain Bukkit/Spigot: one main thread, entities are readable right away. */
-    final class BukkitPlatform implements Platform {
-
-        private final Plugin plugin;
-
-        BukkitPlatform(Plugin plugin) {
-            this.plugin = plugin;
-        }
-
-        @Override
-        public void runAt(World world, int blockX, int blockZ, Runnable task) {
-            if (Bukkit.isPrimaryThread())
-                task.run();
-            else
-                Bukkit.getScheduler().runTask(plugin, task);
-        }
-
-        @Override
-        public CompletableFuture<Location> locate(Player player) {
-            try {
-                return CompletableFuture.completedFuture(player.getLocation());
-            } catch (RuntimeException e) {
-                return CompletableFuture.completedFuture(null);
-            }
         }
     }
 

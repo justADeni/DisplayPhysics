@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.concurrent.locks.LockSupport;
@@ -178,6 +179,37 @@ public final class Assembly {
         }
     }
 
+    /**
+     * Places each piece's block where it came to rest, one task per chunk on the thread that owns it, and releases
+     * the displays once every chunk is done. Only air and replaceable blocks are overwritten.
+     */
+    private void placeBlocks(double[] positions) {
+        Map<Long, List<Integer>> byChunk = new HashMap<>();
+        int[] bx = new int[count], by = new int[count], bz = new int[count];
+        for (int i = 0; i < count; i++) {
+            bx[i] = (int) Math.floor(positions[i * 3]);
+            by[i] = (int) Math.floor(positions[i * 3 + 1]);
+            bz[i] = (int) Math.floor(positions[i * 3 + 2]);
+            byChunk.computeIfAbsent(((long) (bx[i] >> 4) << 32) | ((bz[i] >> 4) & 0xFFFFFFFFL), k -> new ArrayList<>()).add(i);
+        }
+        AtomicInteger remaining = new AtomicInteger(byChunk.size());
+        for (List<Integer> group : byChunk.values()) {
+            int first = group.get(0);
+            platform.runAt(world, bx[first], bz[first], () -> {
+                try {
+                    for (int i : group) {
+                        var block = world.getBlockAt(bx[i], by[i], bz[i]);
+                        if (block.getType().isAir() || block.isReplaceable())
+                            block.setBlockData(pieces.get(i).data(), false);
+                    }
+                } finally {
+                    if (remaining.decrementAndGet() == 0)
+                        release();
+                }
+            });
+        }
+    }
+
     /** Removes the displays from every client and stops a running simulation. Safe to call twice. */
     public void release() {
         if (!released.compareAndSet(false, true))
@@ -280,7 +312,10 @@ public final class Assembly {
             rotations[i * 4] = q.x; rotations[i * 4 + 1] = q.y; rotations[i * 4 + 2] = q.z; rotations[i * 4 + 3] = q.w;
         }
 
-        DisplayPhysics.later(this::release, (long) (settings.autoReleaseSeconds * 1000f));
+        if (settings.turnIntoBlocks)
+            placeBlocks(positions);
+        else
+            DisplayPhysics.later(this::release, (long) (settings.autoReleaseSeconds * 1000f));
         return new Result(positions, rotations, sim.broken(), sim.tick(), error);
     }
 

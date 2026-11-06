@@ -19,6 +19,8 @@ public final class Settings {
     public boolean simd = true;
     /** Whether the real blocks are removed when the simulation starts. */
     public boolean removeBlocks = true;
+    /** Whether the pieces are placed as real blocks where they came to rest, after which the displays are released. */
+    public boolean turnIntoBlocks = false;
     /** Hide pieces from players who can't see them, or {@code null} to send everything to everyone. */
     public Occlusion occlusion = null;
     /** Hard cap on the whole simulation, in seconds. */
@@ -36,6 +38,7 @@ public final class Settings {
     public Settings occlusion(Occlusion v) { occlusion = v; return this; }
     public Settings simd(boolean v) { simd = v; return this; }
     public Settings removeBlocks(boolean v) { removeBlocks = v; return this; }
+    public Settings turnIntoBlocks(boolean v) { turnIntoBlocks = v; return this; }
     public Settings gravity(float v) { gravity = v; return this; }
     public Settings friction(float v) { friction = v; return this; }
     public Settings bounciness(float v) { bounciness = v; return this; }
