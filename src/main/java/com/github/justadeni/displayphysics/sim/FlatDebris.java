@@ -27,7 +27,11 @@ public final class FlatDebris {
     private static final float PAIR_RANGE_SQ = (1f + MARGIN) * (1f + MARGIN);
     private static final float REBUILD_MOVE_SQ = (MARGIN / 2f) * (MARGIN / 2f);
     /** Hash cell size; it must cover the pair range so the neighbouring cells hold every candidate. */
-    private static final float CELL = 2f;
+    private static final float CELL = 1f + MARGIN;
+    /** Every this many ticks, with at least this many pieces awake, the pieces are re-sorted into spatial order in memory. */
+    private static final int REORDER_TICKS = 16, REORDER_MIN_PIECES = 2048;
+    private int ticks;
+
     /** How far outside the pieces the terrain grid must reach: a tick's travel, the corners, and the neighbour voxels. */
     private static final int GRID_MARGIN = 4;
 
@@ -47,6 +51,8 @@ public final class FlatDebris {
     private int[] cellCursor = new int[0];
     private final int[] inCell;
     private final int[] sortedByCell;
+    /** The positions of the pieces in cell order, so testing a run of candidates streams contiguous memory. */
+    private final float[] sortedX, sortedY, sortedZ;
     private int[] occupied = new int[256];
     private final int[] cellNext;
     private final float[] builtX, builtY, builtZ;
@@ -63,6 +69,9 @@ public final class FlatDebris {
         this.cellNext = new int[bodies.capacity];
         this.inCell = new int[bodies.capacity];
         this.sortedByCell = new int[bodies.capacity];
+        this.sortedX = new float[bodies.capacity];
+        this.sortedY = new float[bodies.capacity];
+        this.sortedZ = new float[bodies.capacity];
         this.builtX = new float[bodies.capacity];
         this.builtY = new float[bodies.capacity];
         this.builtZ = new float[bodies.capacity];
@@ -109,6 +118,8 @@ public final class FlatDebris {
     }
 
     // ── Reading the state, by piece ──────────────────────────────────────────
+
+    public int awakeCount() { return b.awake; }
 
     public boolean asleep(int piece) {
         return b.slot[piece] >= b.awake;
@@ -169,7 +180,9 @@ public final class FlatDebris {
     // ── Stepping ─────────────────────────────────────────────────────────────
 
     /** Where the time of a tick goes, in nanoseconds summed over all ticks, by stage: see {@link #STAGES}. */
-    public final long[] stageNanos = new long[8];
+    public final long[] stageNanos = new long[12];
+    /** Pair-search statistics, summed over all ticks: list builds, candidate pairs tested, pairs kept. */
+    public long builds, candidates, kept;
     public static final String[] STAGES = {"grid", "pair search", "forces", "pair solve", "terrain", "integrate", "calm + sleep", "total"};
 
     /** Advances one tick; returns whether every piece has come to rest. */
@@ -182,6 +195,9 @@ public final class FlatDebris {
         prepareGrid(awake);
         Arrays.fill(b.touch, 0, awake, 0f);
         t = lap(0, t);
+        if (awake >= REORDER_MIN_PIECES && ticks++ % REORDER_TICKS == 0 && sortIntoCells(awake))
+            b.permute(sortedByCell, awake);
+        t = lap(1, t);
         buildPairs(awake);
         t = lap(1, t);
 
@@ -274,25 +290,34 @@ public final class FlatDebris {
      * grid of cells (no hashing, one contiguous run of pieces per cell); only half of the neighbouring cells are
      * searched (the others find the pair from the other side), so each pair is found once.
      */
-    private void buildPairs(int awake) {
+    // The dense grid's shape, set by sortIntoCells
+    private int cellsX, cellsY, cellsZ, occupiedCount;
+
+    /**
+     * Counting-sorts the awake pieces into cells: afterwards {@code sortedByCell} lists the slots cell by cell,
+     * {@code cellStart} says where each cell's run begins and {@code occupied} lists the non-empty cells.
+     *
+     * @return false if the pieces are spread over too many cells for a dense grid
+     */
+    private boolean sortIntoCells(int awake) {
+        long t0 = System.nanoTime();
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
         float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
         for (int i = 0; i < awake; i++) {
             minX = Math.min(minX, b.px[i]); maxX = Math.max(maxX, b.px[i]);
             minY = Math.min(minY, b.py[i]); maxY = Math.max(maxY, b.py[i]);
             minZ = Math.min(minZ, b.pz[i]); maxZ = Math.max(maxZ, b.pz[i]);
-            builtX[i] = b.px[i];
-            builtY[i] = b.py[i];
-            builtZ[i] = b.pz[i];
         }
         // One empty cell of margin on every side, so neighbour cells never fall off the grid
         int nx = (int) ((maxX - minX) / CELL) + 3, ny = (int) ((maxY - minY) / CELL) + 3, nz = (int) ((maxZ - minZ) / CELL) + 3;
         long total = (long) nx * ny * nz;
-        pairCount = 0;
-        if (total > denseCellLimit) {
-            buildPairsHashed(awake);
-            return;
-        }
+        if (total > denseCellLimit)
+            return false;
+        cellsX = nx;
+        cellsY = ny;
+        cellsZ = nz;
+        stageNanos[8] += System.nanoTime() - t0;
+        t0 = System.nanoTime();
 
         int size = (int) total;
         if (cellStart.length < size + 1) {
@@ -302,7 +327,7 @@ public final class FlatDebris {
             Arrays.fill(cellStart, 0, size + 1, 0);
         }
 
-        int occupiedCount = 0;
+        occupiedCount = 0;
         for (int i = 0; i < awake; i++) {
             int cx = (int) ((b.px[i] - minX) / CELL) + 1, cy = (int) ((b.py[i] - minY) / CELL) + 1, cz = (int) ((b.pz[i] - minZ) / CELL) + 1;
             int c = (cy * nz + cz) * nx + cx;
@@ -313,36 +338,97 @@ public final class FlatDebris {
                 occupied[occupiedCount++] = c;
             }
         }
+        stageNanos[9] += System.nanoTime() - t0;
+        t0 = System.nanoTime();
         // Prefix sums turn the counts into where each cell's run starts
         for (int c = 0; c < size; c++)
             cellStart[c + 1] += cellStart[c];
         System.arraycopy(cellStart, 0, cellCursor, 0, size);
         for (int i = 0; i < awake; i++)
             sortedByCell[cellCursor[inCell[i]]++] = i;
+        stageNanos[10] += System.nanoTime() - t0;
+        return true;
+    }
 
+    /**
+     * Lists every pair of awake pieces close enough to touch soon. The pieces are counting-sorted into a dense
+     * grid of cells (no hashing, one contiguous run of pieces per cell); only half of the neighbouring cells are
+     * searched (the others find the pair from the other side), so each pair is found once.
+     */
+    private void buildPairs(int awake) {
+        builds++;
+        pairCount = 0;
+        for (int i = 0; i < awake; i++) {
+            builtX[i] = b.px[i];
+            builtY[i] = b.py[i];
+            builtZ[i] = b.pz[i];
+        }
+        if (!sortIntoCells(awake)) {
+            buildPairsHashed(awake);
+            return;
+        }
+
+        long t0 = System.nanoTime();
+        for (int k = 0; k < awake; k++) {
+            int slot = sortedByCell[k];
+            sortedX[k] = b.px[slot];
+            sortedY[k] = b.py[slot];
+            sortedZ[k] = b.pz[slot];
+        }
+
+        int nx = cellsX, nz = cellsZ;
         int strideY = nz * nx;
+        var neighbourFrom = new int[13];
+        var neighbourTo = new int[13];
         for (int k = 0; k < occupiedCount; k++) {
             int c = occupied[k];
             int from = cellStart[c], to = cellStart[c + 1];
-            for (int a = from; a < to; a++)
-                for (int o = a + 1; o < to; o++)
-                    addPair(sortedByCell[a], sortedByCell[o]);
 
-            // The 13 neighbours that come after this cell in x, y, z order
+            // The runs of the 13 neighbours that come after this cell in x, y, z order
+            int neighbours = 0, candidatesPerPiece = to - from;
             for (int dy = 0; dy <= 1; dy++)
                 for (int dz = -1; dz <= 1; dz++)
                     for (int dx = -1; dx <= 1; dx++) {
                         if (dy == 0 && (dz < 0 || (dz == 0 && dx <= 0)))
                             continue;
                         int n = c + dy * strideY + dz * nx + dx;
-                        int nFrom = cellStart[n], nTo = cellStart[n + 1];
-                        if (nFrom == nTo)
+                        if (cellStart[n] == cellStart[n + 1])
                             continue;
-                        for (int a = from; a < to; a++)
-                            for (int o = nFrom; o < nTo; o++)
-                                addPair(sortedByCell[a], sortedByCell[o]);
+                        neighbourFrom[neighbours] = cellStart[n];
+                        neighbourTo[neighbours] = cellStart[n + 1];
+                        candidatesPerPiece += cellStart[n + 1] - cellStart[n];
+                        neighbours++;
                     }
+
+            for (int a = from; a < to; a++) {
+                if (pairCount + candidatesPerPiece > pairA.length) {
+                    int grown = Math.max(pairA.length * 2, pairCount + candidatesPerPiece);
+                    pairA = Arrays.copyOf(pairA, grown);
+                    pairB = Arrays.copyOf(pairB, grown);
+                }
+                float ax = sortedX[a], ay = sortedY[a], az = sortedZ[a];
+                int slotA = sortedByCell[a];
+                int count = pairCount;
+                // Every candidate is written, and the count only moves on if it is close enough: no unpredictable branch
+                for (int o = a + 1; o < to; o++) {
+                    float dx = sortedX[o] - ax, dy = sortedY[o] - ay, dz = sortedZ[o] - az;
+                    pairA[count] = slotA;
+                    pairB[count] = sortedByCell[o];
+                    count += dx * dx + dy * dy + dz * dz < PAIR_RANGE_SQ ? 1 : 0;
+                }
+                for (int r = 0; r < neighbours; r++)
+                    for (int o = neighbourFrom[r], end = neighbourTo[r]; o < end; o++) {
+                        float dx = sortedX[o] - ax, dy = sortedY[o] - ay, dz = sortedZ[o] - az;
+                        pairA[count] = slotA;
+                        pairB[count] = sortedByCell[o];
+                        count += dx * dx + dy * dy + dz * dz < PAIR_RANGE_SQ ? 1 : 0;
+                    }
+                candidates += candidatesPerPiece - (a - from);
+                pairCount = count;
+            }
         }
+        kept += pairCount;
+        stageNanos[11] += System.nanoTime() - t0;
     }
 
     /** The pair search for pieces too spread out for a dense grid: a hash map from cell to the pieces in it. */
@@ -371,6 +457,7 @@ public final class FlatDebris {
     }
 
     private void addPair(int i, int j) {
+        candidates++;
         float dx = b.px[j] - b.px[i], dy = b.py[j] - b.py[i], dz = b.pz[j] - b.pz[i];
         if (dx * dx + dy * dy + dz * dz >= PAIR_RANGE_SQ)
             return;
@@ -381,6 +468,7 @@ public final class FlatDebris {
         pairA[pairCount] = i;
         pairB[pairCount] = j;
         pairCount++;
+        kept++;
     }
 
     private boolean movedTooFar(int awake) {

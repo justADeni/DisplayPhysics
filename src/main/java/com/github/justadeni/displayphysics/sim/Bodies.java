@@ -61,6 +61,40 @@ public final class Bodies {
         ints = new int[][]{calm, id};
     }
 
+    private float[] scratchFloats;
+    private boolean[] scratchBooleans;
+    private int[] scratchInts;
+
+    /**
+     * Rearranges slots {@code [0, n)} so that slot {@code k} holds what slot {@code order[k]} held, which must be
+     * a permutation of {@code [0, n)}. Sorting the pieces into spatial order this way puts neighbours next to each
+     * other in memory, which is what the pair search and pair solver then read.
+     */
+    public void permute(int[] order, int n) {
+        if (scratchFloats == null) {
+            scratchFloats = new float[capacity];
+            scratchBooleans = new boolean[capacity];
+            scratchInts = new int[capacity];
+        }
+        for (float[] array : floats) {
+            for (int k = 0; k < n; k++)
+                scratchFloats[k] = array[order[k]];
+            System.arraycopy(scratchFloats, 0, array, 0, n);
+        }
+        for (boolean[] array : booleans) {
+            for (int k = 0; k < n; k++)
+                scratchBooleans[k] = array[order[k]];
+            System.arraycopy(scratchBooleans, 0, array, 0, n);
+        }
+        for (int[] array : ints) {
+            for (int k = 0; k < n; k++)
+                scratchInts[k] = array[order[k]];
+            System.arraycopy(scratchInts, 0, array, 0, n);
+        }
+        for (int k = 0; k < n; k++)
+            slot[id[k]] = k;
+    }
+
     /** Exchanges two slots completely, keeping the id/slot maps consistent. */
     public void swap(int a, int b) {
         if (a == b)
