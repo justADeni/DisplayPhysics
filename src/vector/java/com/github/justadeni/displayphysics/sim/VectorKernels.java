@@ -2,361 +2,684 @@ package com.github.justadeni.displayphysics.sim;
 
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.IntVector;
-import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorMask;
+import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
+
+import java.util.Arrays;
 
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
 
 /**
- * Hybrid kernels: a scalar pass probes the corners of each piece (branchy byte lookups) and copies every piece
- * that has contacts, with its contacts, into dense per-group structure-of-arrays records; the SIMD solver then
- * streams over those with plain vector loads. Pieces are grouped by their number of contacts, so every lane of a
- * vector runs the same number of contact rounds. A final scalar pass writes the velocities back.
+ * SIMD kernels. The terrain kernel works in small static passes over a chunk of pieces that talk through reusable
+ * scratch rows only (no vector lives across a method boundary, which keeps C2 from boxing them):
+ * <ol>
+ *   <li>cull: a piece whose centre voxel has no terrain within one voxel cannot touch anything (flag
+ *       {@link Grid#NEAR}); the others are compressed into a candidate list;</li>
+ *   <li>probe: the eight corners of the candidates against the grid, one gather each; only the "corner is in a solid
+ *       voxel" bit is kept, and the candidates are listed by how many corners that is;</li>
+ *   <li>solve, per count: vectors of pieces that all have the same number of solid corners, so no lane idles. The
+ *       way out of each voxel is chosen there, once per contact slot, on dense lanes.</li>
+ * </ol>
  */
 public final class VectorKernels implements Kernels {
 
-    private static final VectorSpecies<Float> SP = FloatVector.SPECIES_PREFERRED;
-    private static final int L = SP.length();
+    private static final VectorSpecies<Float> F = FloatVector.SPECIES_PREFERRED;
+    private static final VectorSpecies<Integer> I = IntVector.SPECIES_PREFERRED;
+    private static final int L = F.length();
 
-    /** Pieces handled per chunk: keeps the scratch records in cache. */
-    private static final int CH = 4096;
-    private static final int GS = CH + L;           // one group's capacity (plus a vector of slack for the tail)
-    private static final int CHS = CH + L;
-    private static final int GROUPS = 9;            // groups of 0..8 contacts (0 unused)
-    private static final int TOT = GROUPS * GS;
+    /** Pieces per chunk. */
+    private static final int CHUNK = 2048;
+    private static final int CAP = CHUNK + 2 * L;
 
-    // state fields
-    private static final int VX = 0, VY = 1, VZ = 2, WX = 3, WY = 4, WZ = 5, VPX = 6, VPY = 7, VPZ = 8, WPX = 9, WPY = 10, WPZ = 11,
-            IM = 12, II = 13, MU = 14, RE = 15, SF = 16;
-    // contact fields
-    private static final int RX = 0, RY = 1, RZ = 2, AX = 3, AY = 4, AZ = 5, SG = 6, TG = 7, KN = 8, K1 = 9, K2 = 10, BO = 11,
-            ACN = 12, AC1 = 13, AC2 = 14, ACP = 15, CF = 16;
+    // Scratch floats per contact slot (one vector each)
+    private static final int RX = 0, RY = 1, RZ = 2, NX = 3, NY = 4, NZ = 5, AX = 6, AY = 7, AZ = 8, KN = 9, K1 = 10, K2 = 11,
+            BOUNCE = 12, TARGET = 13, ACC_N = 14, ACC_1 = 15, ACC_2 = 16, ACC_P = 17, CN1 = 18, CN2 = 19, C12 = 20, NF = 21;
+
+    // Per-vector state rows
+    private static final int VX = 0, VY = 1, VZ = 2, WX = 3, WY = 4, WZ = 5, IM = 6, II = 7, MU = 8, VPX = 9, VPY = 10, VPZ = 11,
+            WPX = 12, WPY = 13, WPZ = 14, RES = 15, PX = 16, PY = 17, PZ = 18, C0X = 19, C0Y = 20, C0Z = 21, C1X = 22, C1Y = 23,
+            C1Z = 24, C2X = 25, C2Y = 26, C2Z = 27, NS = 28;
+
+    /** Everything one group vector needs while it is solved. Two of them are solved side by side so their dependency chains overlap. */
+    private static final class Ctx {
+        final int[] idx = new int[L], pidx = new int[L], pos = new int[L];
+        /** The corners still to turn into contacts, and whether a lane got any, per lane. */
+        final int[] left = new int[L], got = new int[L];
+        final int[] cell = new int[L], code = new int[L];
+        final float[] f = new float[8 * NF * L];
+        final float[] cs = new float[8 * L];
+        final float[] st = new float[NS * L];
+    }
 
     private static final class Scratch {
-        final float[] s = new float[SF * TOT];
-        final float[] c = new float[8 * CF * TOT];
-        final int[] id = new int[TOT];
-        final int[] cursor = new int[GROUPS];
-        final float[] tmp = new float[8 * 8];
-        final int[] cornerCell = new int[8 * CHS];
-        final int[] hits = new int[CH + 1], hitMask = new int[CH + 1];
-        int hitCount;
+        /** Candidate piece indices. */
+        final int[] cand = new int[CAP];
+        /** Per candidate: bit c set when corner c is inside a solid voxel. */
+        final int[] bits = new int[CAP];
+        /** Candidates (positions in cand) with k solid corners: k * CAP + n. */
+        final int[] hit = new int[9 * CAP];
+        final int[] hitN = new int[9];
+        final int[] idx = new int[L], row = new int[L], pi = new int[2 * L];
+        final float[] pc = new float[18 * L], dn = new float[ND * CAP];
+        final Ctx x0 = new Ctx(), x1 = new Ctx();
     }
 
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
 
-    /** Debug: ns in probe+copy-in, solve, copy-out; pieces with contacts; pieces. */
-    public static final long[] TIME = new long[7];
-
-    private final Kernels scalar = Kernels.scalar();
-
-    public VectorKernels() {}
+    public VectorKernels() {
+        if (I.length() != L)
+            throw new IllegalStateException("float and int lanes differ");
+    }
 
     @Override
     public String name() {
-        return "vector-hybrid";
+        return "vector";
+    }
+
+    private static IntVector trunc(FloatVector v) {
+        return (IntVector) v.convert(VectorOperators.F2I, 0);
+    }
+
+    private static FloatVector toFloat(IntVector v) {
+        return (FloatVector) v.convert(VectorOperators.I2F, 0);
+    }
+
+    // ── Terrain ──────────────────────────────────────────────────────────────
+
+    @Override
+    public void terrain(Bodies b, int from, int to, Grid grid, float dt) {
+        Scratch s = SCRATCH.get();
+        for (int base = from; base < to; base += CHUNK) {
+            int end = Math.min(base + CHUNK, to);
+            long t0 = PROFILE ? System.nanoTime() : 0;
+            int nc = cull(b, grid, s, base, end);
+            if (PROFILE) { long t = System.nanoTime(); TIME[0] += t - t0; t0 = t; TIME[5] += nc; }
+            if (nc == 0)
+                continue;
+            Arrays.fill(s.hitN, 0);
+            for (int j = 0; j < nc; j += L)
+                probe(grid, s, j, nc);
+            if (PROFILE) { long t = System.nanoTime(); TIME[1] += t - t0; }
+            for (int k = 1; k <= 8; k++) {
+                int n = s.hitN[k];
+                for (int h = 0; h < n; h += 2 * L)
+                    solve(b, grid, s, k, h, n, dt);
+            }
+        }
+    }
+
+    /** floor(v) as ScalarKernels does it: truncation, minus one where that rounded up (negative values). */
+    private static IntVector floor(FloatVector v) {
+        IntVector t = trunc(v);
+        return t.sub(1, v.compare(VectorOperators.LT, toFloat(t)).cast(I));
+    }
+
+    // Rows of the candidate arrays dn: the orientation and position of each candidate
+    private static final int DQX = 0, DQY = 1, DQZ = 2, DQW = 3, DPX = 4, DPY = 5, DPZ = 6, ND = 7;
+
+    /**
+     * Pieces whose centre voxel has no exposed terrain within one voxel cannot touch anything. The others are
+     * compressed into the candidate list: their index, orientation and position, densely, so the probe streams.
+     */
+    private static int cull(Bodies b, Grid grid, Scratch s, int from, int to) {
+        int nc = 0;
+        final int[] idx = s.idx, cand = s.cand, nbr = grid.nbr;
+        final float[] dn = s.dn;
+        final int sx = grid.sx, sz = grid.sz, base = (grid.y0 * sz + grid.z0) * sx + grid.x0;
+        final IntVector iota = IntVector.zero(I).addIndex(1);
+        for (int i = from; i < to; i += L) {
+            VectorMask<Float> m = F.indexInRange(i, to);
+            IntVector ix = floor(FloatVector.fromArray(F, b.px, i, m));
+            IntVector iy = floor(FloatVector.fromArray(F, b.py, i, m));
+            IntVector iz = floor(FloatVector.fromArray(F, b.pz, i, m));
+            VectorMask<Integer> mi = m.cast(I);
+            iy.mul(sz).add(iz).mul(sx).add(ix).sub(base).blend(0, mi.not()).intoArray(idx, 0);
+            VectorMask<Integer> near = IntVector.fromArray(I, nbr, 0, idx, 0).compare(VectorOperators.NE, 0).and(mi);
+            int count = near.trueCount();
+            if (count == 0)
+                continue;
+            VectorMask<Float> nf = near.cast(F);
+            iota.add(i).compress(near).intoArray(cand, nc);
+            FloatVector.fromArray(F, b.qx, i, m).compress(nf).intoArray(dn, DQX * CAP + nc);
+            FloatVector.fromArray(F, b.qy, i, m).compress(nf).intoArray(dn, DQY * CAP + nc);
+            FloatVector.fromArray(F, b.qz, i, m).compress(nf).intoArray(dn, DQZ * CAP + nc);
+            FloatVector.fromArray(F, b.qw, i, m).compress(nf).intoArray(dn, DQW * CAP + nc);
+            FloatVector.fromArray(F, b.px, i, m).compress(nf).intoArray(dn, DPX * CAP + nc);
+            FloatVector.fromArray(F, b.py, i, m).compress(nf).intoArray(dn, DPY * CAP + nc);
+            FloatVector.fromArray(F, b.pz, i, m).compress(nf).intoArray(dn, DPZ * CAP + nc);
+            nc += count;
+        }
+        // The tail of the last probe vector repeats the last candidate, so its gather stays in range
+        for (int r = 0; r < ND && nc > 0; r++)
+            Arrays.fill(dn, r * CAP + nc, r * CAP + nc + L, dn[r * CAP + nc - 1]);
+        return nc;
+    }
+
+    private static void probe(Grid grid, Scratch s, int j0, int nc) {
+        final int[] idx = s.idx, wide = grid.wide;
+        final float[] pc = s.pc;
+        VectorMask<Integer> mi = I.indexInRange(j0, nc);
+        IntVector jv = IntVector.zero(I).addIndex(1).add(j0).blend(j0, mi.not());
+        final int sx = grid.sx, sz = grid.sz, base = (grid.y0 * sz + grid.z0) * sx + grid.x0;
+        corners(grid.nbr, s, j0, sx, sz, base);
+        IntVector.zero(I).intoArray(s.row, 0);
+        for (int c = 0; c < 8; c++)
+            probeCorner(pc, c, sx, sz, base, s.pi, s.row);
+        IntVector bits = IntVector.fromArray(I, s.row, 0);
+        bits.intoArray(s.bits, j0);
+
+        IntVector cnt = bits.lanewise(VectorOperators.BIT_COUNT);
+        for (int k = 1; k <= 8; k++) {
+            VectorMask<Integer> mk = cnt.compare(VectorOperators.EQ, k).and(mi);
+            jv.compress(mk).intoArray(s.hit, k * CAP + s.hitN[k]);
+            s.hitN[k] += mk.trueCount();
+        }
+    }
+
+    // Rows of pc: 0..11 the sums (+-c0 +-c1) for the four sign pairs and three axes, 12..14 c2, 15..17 the position
+    private static void corners(int[] nbr, Scratch s, int j0, int sx, int sz, int base) {
+        final float[] dn = s.dn, pc = s.pc;
+        FloatVector qx = FloatVector.fromArray(F, dn, DQX * CAP + j0), qy = FloatVector.fromArray(F, dn, DQY * CAP + j0);
+        FloatVector qz = FloatVector.fromArray(F, dn, DQZ * CAP + j0), qw = FloatVector.fromArray(F, dn, DQW * CAP + j0);
+        FloatVector xx = qx.mul(qx), yy = qy.mul(qy), zz = qz.mul(qz), xy = qx.mul(qy), xz = qx.mul(qz), yz = qy.mul(qz);
+        FloatVector wxq = qw.mul(qx), wyq = qw.mul(qy), wzq = qw.mul(qz);
+        FloatVector c0x = yy.add(zz).mul(-2f * CORNER).add(CORNER);
+        FloatVector c0y = xy.add(wzq).mul(2f * CORNER), c0z = xz.sub(wyq).mul(2f * CORNER);
+        FloatVector c1x = xy.sub(wzq).mul(2f * CORNER), c1y = xx.add(zz).mul(-2f * CORNER).add(CORNER), c1z = yz.add(wxq).mul(2f * CORNER);
+        // (+-c0 +-c1) +- c2, added in the scalar kernel's order, so a corner on a voxel face falls the same way
+        c0x.add(c1x).neg().intoArray(pc, 0); c0y.add(c1y).neg().intoArray(pc, L); c0z.add(c1z).neg().intoArray(pc, 2 * L);
+        c0x.sub(c1x).intoArray(pc, 3 * L); c0y.sub(c1y).intoArray(pc, 4 * L); c0z.sub(c1z).intoArray(pc, 5 * L);
+        c1x.sub(c0x).intoArray(pc, 6 * L); c1y.sub(c0y).intoArray(pc, 7 * L); c1z.sub(c0z).intoArray(pc, 8 * L);
+        c0x.add(c1x).intoArray(pc, 9 * L); c0y.add(c1y).intoArray(pc, 10 * L); c0z.add(c1z).intoArray(pc, 11 * L);
+        xz.add(wyq).mul(2f * CORNER).intoArray(pc, 12 * L);
+        yz.sub(wxq).mul(2f * CORNER).intoArray(pc, 13 * L);
+        xx.add(yy).mul(-2f * CORNER).add(CORNER).intoArray(pc, 14 * L);
+        FloatVector px = FloatVector.fromArray(F, dn, DPX * CAP + j0), py = FloatVector.fromArray(F, dn, DPY * CAP + j0), pz = FloatVector.fromArray(F, dn, DPZ * CAP + j0);
+        px.intoArray(pc, 15 * L); py.intoArray(pc, 16 * L); pz.intoArray(pc, 17 * L);
+
+        // The centre voxel: one gather gives which of the 27 voxels around it can be touched
+        IntVector ix = floor(px), iy = floor(py), iz = floor(pz);
+        iy.mul(sz).add(iz).mul(sx).add(ix).sub(base).intoArray(s.idx, 0);
+        IntVector.fromArray(I, nbr, 0, s.idx, 0).intoArray(s.pi, L);
+        // bit of the voxel a corner lies in = 13 + (floor(corner) - floor(centre)) summed with weights 1, 3, 9
+        IntVector.broadcast(I, 13).sub(ix.add(iy.mul(3)).add(iz.mul(9))).intoArray(s.pi, 0);
+    }
+
+    private static void probeCorner(float[] pc, int c, int sx, int sz, int base, int[] pi, int[] bitsRow) {
+        final FloatVector sc = FloatVector.broadcast(F, (c & 4) == 0 ? -1f : 1f);
+        final int ab = (c & 3) * 3 * L;
+        FloatVector cx = FloatVector.fromArray(F, pc, 12 * L).fma(sc, FloatVector.fromArray(F, pc, ab)).add(FloatVector.fromArray(F, pc, 15 * L));
+        FloatVector cy = FloatVector.fromArray(F, pc, 13 * L).fma(sc, FloatVector.fromArray(F, pc, ab + L)).add(FloatVector.fromArray(F, pc, 16 * L));
+        FloatVector cz = FloatVector.fromArray(F, pc, 14 * L).fma(sc, FloatVector.fromArray(F, pc, ab + 2 * L)).add(FloatVector.fromArray(F, pc, 17 * L));
+        IntVector ix = trunc(cx), iy = trunc(cy), iz = trunc(cz);
+        ix = ix.sub(1, cx.compare(VectorOperators.LT, toFloat(ix)).cast(I));
+        iy = iy.sub(1, cy.compare(VectorOperators.LT, toFloat(iy)).cast(I));
+        iz = iz.sub(1, cz.compare(VectorOperators.LT, toFloat(iz)).cast(I));
+        IntVector bit = ix.add(iy.mul(3)).add(iz.mul(9)).add(IntVector.fromArray(I, pi, 0));
+        VectorMask<Integer> solid = IntVector.fromArray(I, pi, L).lanewise(VectorOperators.LSHR, bit).and(1).compare(VectorOperators.NE, 0);
+        IntVector.fromArray(I, bitsRow, 0).lanewise(VectorOperators.OR, 1 << c, solid).intoArray(bitsRow, 0);
+    }
+
+    /** Debug: ns in cull, probe, load, contacts, iterate, finish; candidates; pieces solved. */
+    public static final boolean PROFILE = Boolean.getBoolean("dp.profile");
+    public static final long[] TIME = new long[9];
+    private static final int TYPE_MASK = Grid.TYPE_MASK;
+
+    private static void solve(Bodies b, Grid grid, Scratch s, int k, int h0, int n, float dt) {
+        final Ctx x = s.x0, y = s.x1;
+        final boolean two = h0 + L < n;
+        long t0 = PROFILE ? System.nanoTime() : 0;
+        load(b, s, x, k, h0, n);
+        if (two)
+            load(b, s, y, k, h0 + L, n);
+        if (PROFILE) { long t = System.nanoTime(); TIME[2] += t - t0; t0 = t; }
+        final float scale = BAUMGARTE / dt;
+        for (int c = 0; c < k; c++) {
+            contact(grid, x, c, scale);
+            if (two)
+                contact(grid, y, c, scale);
+        }
+        if (PROFILE) { long t = System.nanoTime(); TIME[3] += t - t0; t0 = t; }
+        for (int it = 0; it < ITERATIONS; it++)
+            for (int c = 0; c < k; c++) {
+                iterateStep(x, c);
+                if (two)
+                    iterateStep(y, c);
+            }
+        if (PROFILE) { long t = System.nanoTime(); TIME[4] += t - t0; t0 = t; }
+        for (int it = 0; it < ITERATIONS; it++)
+            for (int c = 0; c < k; c++) {
+                splitStep(x, c);
+                if (two)
+                    splitStep(y, c);
+            }
+        store(b, x);
+        if (two)
+            store(b, y);
+        if (PROFILE) { long t = System.nanoTime(); TIME[6] += t - t0; TIME[7] += Math.min(2 * L, n - h0) * 1L; TIME[8] += k; }
+    }
+
+    /** Gathers the pieces of one group vector and the rotation columns into the state rows. */
+    private static void load(Bodies b, Scratch sc, Ctx s, int k, int h0, int n) {
+        final int[] pidx = s.pidx, pos = s.pos;
+        final float[] st = s.st;
+        final int base = k * CAP + h0;
+        VectorMask<Integer> mi = I.indexInRange(h0, n);
+        IntVector jv = IntVector.fromArray(I, sc.hit, base, mi).blend(IntVector.broadcast(I, sc.hit[base]), mi.not());
+        jv.intoArray(pos, 0);
+        IntVector.fromArray(I, sc.cand, 0, pos, 0).intoArray(pidx, 0);
+        IntVector.fromArray(I, sc.bits, 0, pos, 0).intoArray(s.left, 0);
+        IntVector.zero(I).intoArray(s.got, 0);
+
+        FloatVector qx = FloatVector.fromArray(F, b.qx, 0, pidx, 0), qy = FloatVector.fromArray(F, b.qy, 0, pidx, 0);
+        FloatVector qz = FloatVector.fromArray(F, b.qz, 0, pidx, 0), qw = FloatVector.fromArray(F, b.qw, 0, pidx, 0);
+        FloatVector xx = qx.mul(qx), yy = qy.mul(qy), zz = qz.mul(qz), xy = qx.mul(qy), xz = qx.mul(qz), yz = qy.mul(qz);
+        FloatVector wxq = qw.mul(qx), wyq = qw.mul(qy), wzq = qw.mul(qz);
+        yy.add(zz).mul(-2f * CORNER).add(CORNER).intoArray(st, C0X * L);
+        xy.add(wzq).mul(2f * CORNER).intoArray(st, C0Y * L);
+        xz.sub(wyq).mul(2f * CORNER).intoArray(st, C0Z * L);
+        xy.sub(wzq).mul(2f * CORNER).intoArray(st, C1X * L);
+        xx.add(zz).mul(-2f * CORNER).add(CORNER).intoArray(st, C1Y * L);
+        yz.add(wxq).mul(2f * CORNER).intoArray(st, C1Z * L);
+        xz.add(wyq).mul(2f * CORNER).intoArray(st, C2X * L);
+        yz.sub(wxq).mul(2f * CORNER).intoArray(st, C2Y * L);
+        xx.add(yy).mul(-2f * CORNER).add(CORNER).intoArray(st, C2Z * L);
+
+        FloatVector.fromArray(F, b.px, 0, pidx, 0).intoArray(st, PX * L);
+        FloatVector.fromArray(F, b.py, 0, pidx, 0).intoArray(st, PY * L);
+        FloatVector.fromArray(F, b.pz, 0, pidx, 0).intoArray(st, PZ * L);
+        FloatVector.fromArray(F, b.vx, 0, pidx, 0).intoArray(st, VX * L);
+        FloatVector.fromArray(F, b.vy, 0, pidx, 0).intoArray(st, VY * L);
+        FloatVector.fromArray(F, b.vz, 0, pidx, 0).intoArray(st, VZ * L);
+        FloatVector.fromArray(F, b.wx, 0, pidx, 0).intoArray(st, WX * L);
+        FloatVector.fromArray(F, b.wy, 0, pidx, 0).intoArray(st, WY * L);
+        FloatVector.fromArray(F, b.wz, 0, pidx, 0).intoArray(st, WZ * L);
+        FloatVector.fromArray(F, b.invMass, 0, pidx, 0).intoArray(st, IM * L);
+        FloatVector.fromArray(F, b.invInertia, 0, pidx, 0).intoArray(st, II * L);
+        FloatVector.fromArray(F, b.mu, 0, pidx, 0).intoArray(st, MU * L);
+        FloatVector.fromArray(F, b.restitution, 0, pidx, 0).intoArray(st, RES * L);
+        FloatVector.fromArray(F, b.vpx, 0, pidx, 0).intoArray(st, VPX * L);
+        FloatVector.fromArray(F, b.vpy, 0, pidx, 0).intoArray(st, VPY * L);
+        FloatVector.fromArray(F, b.vpz, 0, pidx, 0).intoArray(st, VPZ * L);
+        FloatVector.fromArray(F, b.wpx, 0, pidx, 0).intoArray(st, WPX * L);
+        FloatVector.fromArray(F, b.wpy, 0, pidx, 0).intoArray(st, WPY * L);
+        FloatVector.fromArray(F, b.wpz, 0, pidx, 0).intoArray(st, WPZ * L);
+    }
+
+    private static void contact(Grid grid, Ctx s, int c, float scale) {
+        locate(grid, s, c);
+        select(s);
+        derive(s, c, scale);
+    }
+
+    // Rows of cs: 0..2 position inside the voxel, 3..5 corner velocity, 6 best distance
+    private static final int FX = 0, FY = 1, FZ = 2, UX = 3, UY = 4, UZ = 5, BEST = 6;
+
+    /** The next solid corner of every lane: its offset, the voxel it lies in, where in the voxel, and how fast it moves. */
+    private static void locate(Grid grid, Ctx s, int c) {
+        final int[] idx = s.idx;
+        final float[] st = s.st, f = s.f, cs = s.cs;
+        final int o = c * NF * L;
+
+        IntVector left = IntVector.fromArray(I, s.left, 0);
+        left.and(left.sub(1)).intoArray(s.left, 0);
+        // log2 of the lowest set bit through the float exponent
+        IntVector cid = toFloat(left.and(left.neg())).reinterpretAsInts().lanewise(VectorOperators.LSHR, 23).sub(127);
+        final FloatVector two = FloatVector.broadcast(F, 2f), minusOne = FloatVector.broadcast(F, -1f);
+        FloatVector sa = toFloat(cid.and(1)).fma(two, minusOne);
+        FloatVector sb = toFloat(cid.lanewise(VectorOperators.LSHR, 1).and(1)).fma(two, minusOne);
+        FloatVector sc = toFloat(cid.lanewise(VectorOperators.LSHR, 2).and(1)).fma(two, minusOne);
+
+        FloatVector rx = FloatVector.fromArray(F, st, C0X * L).mul(sa).add(FloatVector.fromArray(F, st, C1X * L).mul(sb)).add(FloatVector.fromArray(F, st, C2X * L).mul(sc));
+        FloatVector ry = FloatVector.fromArray(F, st, C0Y * L).mul(sa).add(FloatVector.fromArray(F, st, C1Y * L).mul(sb)).add(FloatVector.fromArray(F, st, C2Y * L).mul(sc));
+        FloatVector rz = FloatVector.fromArray(F, st, C0Z * L).mul(sa).add(FloatVector.fromArray(F, st, C1Z * L).mul(sb)).add(FloatVector.fromArray(F, st, C2Z * L).mul(sc));
+        rx.intoArray(f, o + RX * L); ry.intoArray(f, o + RY * L); rz.intoArray(f, o + RZ * L);
+        FloatVector cpx = FloatVector.fromArray(F, st, PX * L).add(rx);
+        FloatVector cpy = FloatVector.fromArray(F, st, PY * L).add(ry);
+        FloatVector cpz = FloatVector.fromArray(F, st, PZ * L).add(rz);
+
+        IntVector ix = trunc(cpx), iy = trunc(cpy), iz = trunc(cpz);
+        ix = ix.sub(1, cpx.compare(VectorOperators.LT, toFloat(ix)).cast(I));
+        iy = iy.sub(1, cpy.compare(VectorOperators.LT, toFloat(iy)).cast(I));
+        iz = iz.sub(1, cpz.compare(VectorOperators.LT, toFloat(iz)).cast(I));
+        iy.mul(grid.sz).add(iz).mul(grid.sx).add(ix).sub((grid.y0 * grid.sz + grid.z0) * grid.sx + grid.x0).intoArray(idx, 0);
+        IntVector.fromArray(I, grid.wide, 0, idx, 0).intoArray(s.cell, 0);
+
+        cpx.sub(toFloat(ix)).intoArray(cs, FX * L);
+        cpy.sub(toFloat(iy)).intoArray(cs, FY * L);
+        cpz.sub(toFloat(iz)).intoArray(cs, FZ * L);
+        FloatVector vx = FloatVector.fromArray(F, st, VX * L), vy = FloatVector.fromArray(F, st, VY * L), vz = FloatVector.fromArray(F, st, VZ * L);
+        FloatVector wx = FloatVector.fromArray(F, st, WX * L), wy = FloatVector.fromArray(F, st, WY * L), wz = FloatVector.fromArray(F, st, WZ * L);
+        wy.fma(rz, wz.neg().fma(ry, vx)).intoArray(cs, UX * L);
+        wz.fma(rx, wx.neg().fma(rz, vy)).intoArray(cs, UY * L);
+        wx.fma(ry, wy.neg().fma(rx, vz)).intoArray(cs, UZ * L);
+    }
+
+    /**
+     * The way out of the voxel: the nearest open face the corner could have entered through (it is not already leaving
+     * through it), in the scalar kernel's order and with its preference for pushing up. Code bits: 1 = x axis,
+     * 2 = y axis, 4 = z axis, 8 = negative direction; no way out leaves code 0.
+     */
+    private static void select(Ctx s) {
+        final float[] cs = s.cs;
+        IntVector cell = IntVector.fromArray(I, s.cell, 0);
+        FloatVector fx = FloatVector.fromArray(F, cs, FX * L), fy = FloatVector.fromArray(F, cs, FY * L), fz = FloatVector.fromArray(F, cs, FZ * L);
+        FloatVector velX = FloatVector.fromArray(F, cs, UX * L), velY = FloatVector.fromArray(F, cs, UY * L), velZ = FloatVector.fromArray(F, cs, UZ * L);
+
+        FloatVector best = FloatVector.broadcast(F, Float.MAX_VALUE);
+        IntVector code = IntVector.zero(I);
+        FloatVector d;
+        VectorMask<Float> ok;
+
+        d = fy.neg().add(0.95f);
+        ok = cell.and(Grid.OPEN_PY).compare(VectorOperators.NE, 0).cast(F).and(velY.compare(VectorOperators.LT, MAX_EXIT_SPEED)).and(d.compare(VectorOperators.LT, best));
+        best = best.blend(d, ok); code = code.blend(2, ok.cast(I));
+
+        d = fx.neg().add(1f);
+        ok = cell.and(Grid.OPEN_PX).compare(VectorOperators.NE, 0).cast(F).and(velX.compare(VectorOperators.LT, MAX_EXIT_SPEED)).and(d.compare(VectorOperators.LT, best));
+        best = best.blend(d, ok); code = code.blend(1, ok.cast(I));
+
+        ok = cell.and(Grid.OPEN_NX).compare(VectorOperators.NE, 0).cast(F).and(velX.compare(VectorOperators.GT, -MAX_EXIT_SPEED)).and(fx.compare(VectorOperators.LT, best));
+        best = best.blend(fx, ok); code = code.blend(9, ok.cast(I));
+
+        d = fz.neg().add(1f);
+        ok = cell.and(Grid.OPEN_PZ).compare(VectorOperators.NE, 0).cast(F).and(velZ.compare(VectorOperators.LT, MAX_EXIT_SPEED)).and(d.compare(VectorOperators.LT, best));
+        best = best.blend(d, ok); code = code.blend(4, ok.cast(I));
+
+        ok = cell.and(Grid.OPEN_NZ).compare(VectorOperators.NE, 0).cast(F).and(velZ.compare(VectorOperators.GT, -MAX_EXIT_SPEED)).and(fz.compare(VectorOperators.LT, best));
+        best = best.blend(fz, ok); code = code.blend(12, ok.cast(I));
+
+        ok = cell.and(Grid.OPEN_NY).compare(VectorOperators.NE, 0).cast(F).and(velY.compare(VectorOperators.GT, -MAX_EXIT_SPEED)).and(fy.compare(VectorOperators.LT, best));
+        best = best.blend(fy, ok); code = code.blend(10, ok.cast(I));
+
+        best.intoArray(cs, BEST * L);
+        code.intoArray(s.code, 0);
+        IntVector.fromArray(I, s.got, 0).or(code).intoArray(s.got, 0);
+    }
+
+    /** Contact frame, effective masses, bounce and split-impulse targets of the slot; a lane without a way out gets a dead slot. */
+    private static void derive(Ctx s, int c, float scale) {
+        final float[] st = s.st, f = s.f, cs = s.cs;
+        final int o = c * NF * L;
+        final FloatVector zero = FloatVector.zero(F), one = FloatVector.broadcast(F, 1f);
+        IntVector code = IntVector.fromArray(I, s.code, 0);
+        VectorMask<Float> dead = code.compare(VectorOperators.EQ, 0).cast(F);
+
+        FloatVector ax = zero.blend(1f, code.and(1).compare(VectorOperators.NE, 0).cast(F));
+        FloatVector ay = zero.blend(1f, code.and(2).compare(VectorOperators.NE, 0).cast(F));
+        FloatVector az = zero.blend(1f, code.and(4).compare(VectorOperators.NE, 0).cast(F));
+        FloatVector sign = one.blend(-1f, code.and(8).compare(VectorOperators.NE, 0).cast(F));
+        FloatVector nx = ax.mul(sign), ny = ay.mul(sign), nz = az.mul(sign);
+
+        FloatVector rx = FloatVector.fromArray(F, f, o + RX * L), ry = FloatVector.fromArray(F, f, o + RY * L), rz = FloatVector.fromArray(F, f, o + RZ * L);
+        final FloatVector reach = FloatVector.broadcast(F, CORNER_REACH_SQ);
+        FloatVector invMass = FloatVector.fromArray(F, st, IM * L), invInertia = FloatVector.fromArray(F, st, II * L);
+        FloatVector ra = rx.fma(ax, ry.fma(ay, rz.mul(az)));
+        FloatVector r1 = rx.fma(az, ry.fma(ax, rz.mul(ay)));
+        FloatVector r2 = rx.fma(ay, ry.fma(az, rz.mul(ax)));
+        FloatVector kn = one.div(invInertia.fma(ra.neg().fma(ra, reach), invMass)).blend(zero, dead);
+        FloatVector k1 = one.div(invInertia.fma(r1.neg().fma(r1, reach), invMass)).blend(zero, dead);
+        FloatVector k2 = one.div(invInertia.fma(r2.neg().fma(r2, reach), invMass)).blend(zero, dead);
+
+        FloatVector vn = FloatVector.fromArray(F, cs, UX * L).fma(nx, FloatVector.fromArray(F, cs, UY * L).fma(ny, FloatVector.fromArray(F, cs, UZ * L).mul(nz)));
+        FloatVector bounce = FloatVector.fromArray(F, st, RES * L).neg().mul(vn).blend(zero, vn.compare(VectorOperators.GE, -BOUNCE_THRESHOLD).or(dead));
+        // The +y preference was baked into the distance, so it is added back to the depth
+        FloatVector depth = FloatVector.fromArray(F, cs, BEST * L).add(0.05f, code.compare(VectorOperators.EQ, 2).cast(F));
+        FloatVector target = depth.sub(SLOP).max(0f).min(MAX_CORRECTION).mul(scale).blend(zero, dead);
+
+        // Coupling of the impulses through the lever arm: -invInertia * (r.e) * (r.f)
+        FloatVector rn = rx.fma(nx, ry.fma(ny, rz.mul(nz)));
+        FloatVector ni = invInertia.neg();
+        ni.mul(rn).mul(r1).intoArray(f, o + CN1 * L);
+        ni.mul(rn).mul(r2).intoArray(f, o + CN2 * L);
+        ni.mul(r1).mul(r2).intoArray(f, o + C12 * L);
+        nx.intoArray(f, o + NX * L); ny.intoArray(f, o + NY * L); nz.intoArray(f, o + NZ * L);
+        ax.intoArray(f, o + AX * L); ay.intoArray(f, o + AY * L); az.intoArray(f, o + AZ * L);
+        kn.intoArray(f, o + KN * L); k1.intoArray(f, o + K1 * L); k2.intoArray(f, o + K2 * L);
+        bounce.intoArray(f, o + BOUNCE * L);
+        target.intoArray(f, o + TARGET * L);
+        Arrays.fill(f, o + ACC_N * L, o + (ACC_P + 1) * L, 0f);
+    }
+
+    /**
+     * One sequential-impulse step of one contact slot: the normal, then both friction directions. The velocity of the
+     * contact point is computed once; an impulse along axis e changes its component along another axis f by
+     * {@code -invInertia * j * (r.e) * (r.f)} (the invMass and r.r terms cancel for orthogonal axes), which the
+     * precomputed couplings CN1, CN2 and C12 carry, so v and w are updated once at the end.
+     */
+    private static void iterateStep(Ctx s, int c) {
+        final float[] f = s.f, st = s.st;
+        final int o = c * NF * L;
+        FloatVector vx = FloatVector.fromArray(F, st, VX * L), vy = FloatVector.fromArray(F, st, VY * L), vz = FloatVector.fromArray(F, st, VZ * L);
+        FloatVector wx = FloatVector.fromArray(F, st, WX * L), wy = FloatVector.fromArray(F, st, WY * L), wz = FloatVector.fromArray(F, st, WZ * L);
+        FloatVector rx = FloatVector.fromArray(F, f, o + RX * L), ry = FloatVector.fromArray(F, f, o + RY * L), rz = FloatVector.fromArray(F, f, o + RZ * L);
+        FloatVector nx = FloatVector.fromArray(F, f, o + NX * L), ny = FloatVector.fromArray(F, f, o + NY * L), nz = FloatVector.fromArray(F, f, o + NZ * L);
+        FloatVector ax = FloatVector.fromArray(F, f, o + AX * L), ay = FloatVector.fromArray(F, f, o + AY * L), az = FloatVector.fromArray(F, f, o + AZ * L);
+
+        // Velocity of the contact point
+        FloatVector ux = wy.fma(rz, wz.neg().fma(ry, vx));
+        FloatVector uy = wz.fma(rx, wx.neg().fma(rz, vy));
+        FloatVector uz = wx.fma(ry, wy.neg().fma(rx, vz));
+
+        // Normal impulse first, so friction has something to be a fraction of
+        FloatVector vd = ux.fma(nx, uy.fma(ny, uz.mul(nz)));
+        FloatVector accN = FloatVector.fromArray(F, f, o + ACC_N * L);
+        FloatVector nextN = FloatVector.fromArray(F, f, o + BOUNCE * L).sub(vd).fma(FloatVector.fromArray(F, f, o + KN * L), accN).max(0f);
+        nextN.intoArray(f, o + ACC_N * L);
+        FloatVector dn = nextN.sub(accN);
+        FloatVector maxF = FloatVector.fromArray(F, st, MU * L).mul(nextN), minF = maxF.neg();
+
+        // Tangent 1: (az, ax, ay)
+        FloatVector vt = ux.fma(az, uy.fma(ax, uz.mul(ay))).add(dn.mul(FloatVector.fromArray(F, f, o + CN1 * L)));
+        FloatVector acc = FloatVector.fromArray(F, f, o + ACC_1 * L);
+        FloatVector next = vt.neg().fma(FloatVector.fromArray(F, f, o + K1 * L), acc).max(minF).min(maxF);
+        next.intoArray(f, o + ACC_1 * L);
+        FloatVector d1 = next.sub(acc);
+
+        // Tangent 2: (ay, az, ax)
+        vt = ux.fma(ay, uy.fma(az, uz.mul(ax))).add(dn.fma(FloatVector.fromArray(F, f, o + CN2 * L), d1.mul(FloatVector.fromArray(F, f, o + C12 * L))));
+        acc = FloatVector.fromArray(F, f, o + ACC_2 * L);
+        next = vt.neg().fma(FloatVector.fromArray(F, f, o + K2 * L), acc).max(minF).min(maxF);
+        next.intoArray(f, o + ACC_2 * L);
+        FloatVector d2 = next.sub(acc);
+
+        // The total impulse, applied once
+        FloatVector jx = nx.fma(dn, az.fma(d1, ay.mul(d2)));
+        FloatVector jy = ny.fma(dn, ax.fma(d1, az.mul(d2)));
+        FloatVector jz = nz.fma(dn, ay.fma(d1, ax.mul(d2)));
+        FloatVector invMass = FloatVector.fromArray(F, st, IM * L), invInertia = FloatVector.fromArray(F, st, II * L);
+        jx.fma(invMass, vx).intoArray(st, VX * L); jy.fma(invMass, vy).intoArray(st, VY * L); jz.fma(invMass, vz).intoArray(st, VZ * L);
+        ry.fma(jz, rz.neg().mul(jy)).fma(invInertia, wx).intoArray(st, WX * L);
+        rz.fma(jx, rx.neg().mul(jz)).fma(invInertia, wy).intoArray(st, WY * L);
+        rx.fma(jy, ry.neg().mul(jx)).fma(invInertia, wz).intoArray(st, WZ * L);
+    }
+
+    private static void splitStep(Ctx s, int c) {
+        final float[] f = s.f, st = s.st;
+        final FloatVector zero = FloatVector.zero(F);
+        FloatVector invMass = FloatVector.fromArray(F, st, IM * L), invInertia = FloatVector.fromArray(F, st, II * L);
+        final int o = c * NF * L;
+        FloatVector vpx = FloatVector.fromArray(F, st, VPX * L), vpy = FloatVector.fromArray(F, st, VPY * L), vpz = FloatVector.fromArray(F, st, VPZ * L);
+        FloatVector wpx = FloatVector.fromArray(F, st, WPX * L), wpy = FloatVector.fromArray(F, st, WPY * L), wpz = FloatVector.fromArray(F, st, WPZ * L);
+        FloatVector target = FloatVector.fromArray(F, f, o + TARGET * L);
+        FloatVector accP = FloatVector.fromArray(F, f, o + ACC_P * L);
+        VectorMask<Float> active = target.compare(VectorOperators.GT, 0f).or(accP.compare(VectorOperators.NE, 0f));
+        if (!active.anyTrue())
+            return;
+        FloatVector rx = FloatVector.fromArray(F, f, o + RX * L), ry = FloatVector.fromArray(F, f, o + RY * L), rz = FloatVector.fromArray(F, f, o + RZ * L);
+        FloatVector nx = FloatVector.fromArray(F, f, o + NX * L), ny = FloatVector.fromArray(F, f, o + NY * L), nz = FloatVector.fromArray(F, f, o + NZ * L);
+
+        FloatVector velX = wpy.fma(rz, wpz.neg().fma(ry, vpx));
+        FloatVector velY = wpz.fma(rx, wpx.neg().fma(rz, vpy));
+        FloatVector velZ = wpx.fma(ry, wpy.neg().fma(rx, vpz));
+        FloatVector vn = velX.fma(nx, velY.fma(ny, velZ.mul(nz)));
+        FloatVector next = target.sub(vn).fma(FloatVector.fromArray(F, f, o + KN * L), accP).max(0f);
+        FloatVector dn = next.sub(accP).blend(zero, active.not());
+        dn.add(accP).intoArray(f, o + ACC_P * L);
+        FloatVector ix = nx.mul(dn), iy = ny.mul(dn), iz = nz.mul(dn);
+        vpx = ix.fma(invMass, vpx); vpy = iy.fma(invMass, vpy); vpz = iz.fma(invMass, vpz);
+        wpx = ry.fma(iz, rz.neg().mul(iy)).fma(invInertia, wpx);
+        wpy = rz.fma(ix, rx.neg().mul(iz)).fma(invInertia, wpy);
+        wpz = rx.fma(iy, ry.neg().mul(ix)).fma(invInertia, wpz);
+        vpx.intoArray(st, VPX * L); vpy.intoArray(st, VPY * L); vpz.intoArray(st, VPZ * L);
+        wpx.intoArray(st, WPX * L); wpy.intoArray(st, WPY * L); wpz.intoArray(st, WPZ * L);
+    }
+
+    private static void store(Bodies b, Ctx s) {
+        final float[] st = s.st;
+        final int[] pidx = s.pidx;
+        FloatVector.fromArray(F, st, VX * L).intoArray(b.vx, 0, pidx, 0); FloatVector.fromArray(F, st, VY * L).intoArray(b.vy, 0, pidx, 0); FloatVector.fromArray(F, st, VZ * L).intoArray(b.vz, 0, pidx, 0);
+        FloatVector.fromArray(F, st, WX * L).intoArray(b.wx, 0, pidx, 0); FloatVector.fromArray(F, st, WY * L).intoArray(b.wy, 0, pidx, 0); FloatVector.fromArray(F, st, WZ * L).intoArray(b.wz, 0, pidx, 0);
+        FloatVector.fromArray(F, st, VPX * L).intoArray(b.vpx, 0, pidx, 0); FloatVector.fromArray(F, st, VPY * L).intoArray(b.vpy, 0, pidx, 0); FloatVector.fromArray(F, st, VPZ * L).intoArray(b.vpz, 0, pidx, 0);
+        FloatVector.fromArray(F, st, WPX * L).intoArray(b.wpx, 0, pidx, 0); FloatVector.fromArray(F, st, WPY * L).intoArray(b.wpy, 0, pidx, 0); FloatVector.fromArray(F, st, WPZ * L).intoArray(b.wpz, 0, pidx, 0);
+        // Only a piece that got a real contact counts as touching
+        FloatVector.broadcast(F, 1f).intoArray(b.touch, 0, pidx, 0, IntVector.fromArray(I, s.got, 0).compare(VectorOperators.NE, 0).cast(F));
+    }
+
+    // ── Forces ───────────────────────────────────────────────────────────────
+
+    private static FloatVector ld(float[] a, int i, VectorMask<Float> m) {
+        return m == null ? FloatVector.fromArray(F, a, i) : FloatVector.fromArray(F, a, i, m);
+    }
+
+    private static void st(FloatVector v, float[] a, int i, VectorMask<Float> m) {
+        if (m == null)
+            v.intoArray(a, i);
+        else
+            v.intoArray(a, i, m);
     }
 
     @Override
     public void forces(Bodies b, int from, int to, Grid grid, float dt, float gravity) {
-        scalar.forces(b, from, to, grid, dt, gravity);
+        int[] idx = SCRATCH.get().idx;
+        int bound = from + F.loopBound(to - from);
+        for (int i = from; i < bound; i += L)
+            forcesVector(b, grid, idx, i, null, dt, gravity);
+        if (bound < to)
+            forcesVector(b, grid, idx, bound, F.indexInRange(bound, to), dt, gravity);
     }
+
+    private static void forcesVector(Bodies b, Grid grid, int[] idx, int i, VectorMask<Float> m, float dt, float gravity) {
+        FloatVector vx = ld(b.vx, i, m), vy = ld(b.vy, i, m), vz = ld(b.vz, i, m);
+        FloatVector wx = ld(b.wx, i, m), wy = ld(b.wy, i, m), wz = ld(b.wz, i, m);
+        FloatVector linear = ld(b.drag, i, m).fma(FloatVector.broadcast(F, -dt), FloatVector.broadcast(F, 1f));
+        vy = vy.sub(gravity * dt);
+
+        if (grid.liquid) {
+            FloatVector touch = ld(b.touch, i, m);
+            FloatVector px = ld(b.px, i, m), py = ld(b.py, i, m), pz = ld(b.pz, i, m);
+            IntVector ix = trunc(px.sub((float) grid.x0)), iy = trunc(py.sub((float) grid.y0)), iz = trunc(pz.sub((float) grid.z0));
+            iy.mul(grid.sz).add(iz).mul(grid.sx).add(ix).intoArray(idx, 0);
+            VectorMask<Integer> mi = m == null ? I.maskAll(true) : m.cast(I);
+            IntVector cell = IntVector.fromArray(I, grid.wide, 0, idx, 0, mi);
+            VectorMask<Float> liquid = cell.and(TYPE_MASK).compare(VectorOperators.EQ, (int) Grid.LIQUID).cast(F);
+            vy = vy.add(gravity * BUOYANCY * dt, liquid);
+            FloatVector k = FloatVector.broadcast(F, 1f).blend(1f - LIQUID_DRAG * dt, liquid);
+            vx = vx.mul(k); vy = vy.mul(k); vz = vz.mul(k);
+            wx = wx.mul(k); wy = wy.mul(k); wz = wz.mul(k);
+            touch = touch.blend(1f, liquid);
+            st(touch, b.touch, i, m);
+            FloatVector angular = FloatVector.broadcast(F, 1f - 0.2f * dt).blend(1f - ROLLING_RESISTANCE * dt, touch.compare(VectorOperators.GT, 0f));
+            st(vx.mul(linear), b.vx, i, m); st(vy.mul(linear), b.vy, i, m); st(vz.mul(linear), b.vz, i, m);
+            st(wx.mul(angular), b.wx, i, m); st(wy.mul(angular), b.wy, i, m); st(wz.mul(angular), b.wz, i, m);
+            return;
+        }
+
+        FloatVector angular = FloatVector.broadcast(F, 1f - 0.2f * dt).blend(1f - ROLLING_RESISTANCE * dt, ld(b.touch, i, m).compare(VectorOperators.GT, 0f));
+        st(vx.mul(linear), b.vx, i, m); st(vy.mul(linear), b.vy, i, m); st(vz.mul(linear), b.vz, i, m);
+        st(wx.mul(angular), b.wx, i, m); st(wy.mul(angular), b.wy, i, m); st(wz.mul(angular), b.wz, i, m);
+    }
+
+    // ── Integration ──────────────────────────────────────────────────────────
 
     @Override
     public void integrate(Bodies b, int from, int to, float dt) {
-        scalar.integrate(b, from, to, dt);
+        int bound = from + F.loopBound(to - from);
+        for (int i = from; i < bound; i += L)
+            integrateVector(b, i, null, dt);
+        if (bound < to)
+            integrateVector(b, bound, F.indexInRange(bound, to), dt);
     }
+
+    /** Same bit trick and Newton steps as {@code ScalarKernels.inverseSquareRoot}. */
+    private static FloatVector isqrt(FloatVector x) {
+        FloatVector half = x.mul(0.5f), nhalf = half.neg();
+        FloatVector y = IntVector.broadcast(I, 0x5f3759df).sub(x.reinterpretAsInts().lanewise(VectorOperators.ASHR, 1)).reinterpretAsFloats();
+        y = y.mul(nhalf.mul(y).fma(y, FloatVector.broadcast(F, 1.5f)));
+        y = y.mul(nhalf.mul(y).fma(y, FloatVector.broadcast(F, 1.5f)));
+        return y;
+    }
+
+    private static void integrateVector(Bodies b, int i, VectorMask<Float> m, float dt) {
+        final FloatVector one = FloatVector.broadcast(F, 1f);
+        FloatVector vx = ld(b.vx, i, m), vy = ld(b.vy, i, m), vz = ld(b.vz, i, m);
+        FloatVector wx = ld(b.wx, i, m), wy = ld(b.wy, i, m), wz = ld(b.wz, i, m);
+
+        FloatVector speedSquared = vx.fma(vx, vy.fma(vy, vz.mul(vz)));
+        FloatVector spinSquared = wx.fma(wx, wy.fma(wy, wz.mul(wz)));
+        VectorMask<Float> fast = speedSquared.compare(VectorOperators.GT, MAX_SPEED * MAX_SPEED);
+        VectorMask<Float> spinning = spinSquared.compare(VectorOperators.GT, MAX_SPIN * MAX_SPIN);
+        if (fast.or(spinning).anyTrue()) {
+            integrateClamped(b, i, m, dt);
+            return;
+        }
+
+        final float h = 0.5f * dt;
+        final FloatVector dtv = FloatVector.broadcast(F, dt), hh = FloatVector.broadcast(F, h);
+        position(b, i, m, vx, vy, vz, dtv);
+        rotate(b, i, m, wx.add(ld(b.wpx, i, m)), wy.add(ld(b.wpy, i, m)), wz.add(ld(b.wpz, i, m)), hh);
+        clearPseudo(b, i, m);
+    }
+
+    private static void position(Bodies b, int i, VectorMask<Float> m, FloatVector vx, FloatVector vy, FloatVector vz, FloatVector dtv) {
+        st(vx.add(ld(b.vpx, i, m)).fma(dtv, ld(b.px, i, m)), b.px, i, m);
+        st(vy.add(ld(b.vpy, i, m)).fma(dtv, ld(b.py, i, m)), b.py, i, m);
+        st(vz.add(ld(b.vpz, i, m)).fma(dtv, ld(b.pz, i, m)), b.pz, i, m);
+    }
+
+    private static void rotate(Bodies b, int i, VectorMask<Float> m, FloatVector ax, FloatVector ay, FloatVector az, FloatVector hh) {
+        FloatVector nax = ax.neg(), nay = ay.neg(), naz = az.neg();
+        FloatVector qx = ld(b.qx, i, m), qy = ld(b.qy, i, m), qz = ld(b.qz, i, m), qw = ld(b.qw, i, m);
+        FloatVector nqx = ax.fma(qw, ay.fma(qz, naz.mul(qy))).fma(hh, qx);
+        FloatVector nqy = nax.fma(qz, ay.fma(qw, az.mul(qx))).fma(hh, qy);
+        FloatVector nqz = ax.fma(qy, nay.fma(qx, az.mul(qw))).fma(hh, qz);
+        FloatVector nqw = nax.fma(qx, nay.fma(qy, naz.mul(qz))).fma(hh, qw);
+        // The quaternion is within a few percent of unit length, where 1/sqrt(n) is 1.5 - n/2 to better than 1e-3
+        FloatVector inv = FloatVector.broadcast(F, -0.5f).fma(nqx.fma(nqx, nqy.fma(nqy, nqz.fma(nqz, nqw.mul(nqw)))), FloatVector.broadcast(F, 1.5f));
+        st(nqx.mul(inv), b.qx, i, m); st(nqy.mul(inv), b.qy, i, m); st(nqz.mul(inv), b.qz, i, m); st(nqw.mul(inv), b.qw, i, m);
+    }
+
+    private static void clearPseudo(Bodies b, int i, VectorMask<Float> m) {
+        FloatVector zero = FloatVector.zero(F);
+        st(zero, b.vpx, i, m); st(zero, b.vpy, i, m); st(zero, b.vpz, i, m);
+        st(zero, b.wpx, i, m); st(zero, b.wpy, i, m); st(zero, b.wpz, i, m);
+    }
+
+    /** The rare case: some piece moves or spins faster than the limits, so velocities are clamped (and stored) first. */
+    private static void integrateClamped(Bodies b, int i, VectorMask<Float> m, float dt) {
+        FloatVector vx = ld(b.vx, i, m), vy = ld(b.vy, i, m), vz = ld(b.vz, i, m);
+        FloatVector wx = ld(b.wx, i, m), wy = ld(b.wy, i, m), wz = ld(b.wz, i, m);
+        FloatVector speedSquared = vx.fma(vx, vy.fma(vy, vz.mul(vz)));
+        VectorMask<Float> fast = speedSquared.compare(VectorOperators.GT, MAX_SPEED * MAX_SPEED);
+        FloatVector kv = isqrt(speedSquared).mul(MAX_SPEED);
+        vx = vx.mul(kv, fast); vy = vy.mul(kv, fast); vz = vz.mul(kv, fast);
+        FloatVector spinSquared = wx.fma(wx, wy.fma(wy, wz.mul(wz)));
+        VectorMask<Float> spinning = spinSquared.compare(VectorOperators.GT, MAX_SPIN * MAX_SPIN);
+        FloatVector kw = isqrt(spinSquared).mul(MAX_SPIN);
+        wx = wx.mul(kw, spinning); wy = wy.mul(kw, spinning); wz = wz.mul(kw, spinning);
+        st(vx, b.vx, i, m); st(vy, b.vy, i, m); st(vz, b.vz, i, m);
+        st(wx, b.wx, i, m); st(wy, b.wy, i, m); st(wz, b.wz, i, m);
+        position(b, i, m, vx, vy, vz, FloatVector.broadcast(F, dt));
+        rotate(b, i, m, wx.add(ld(b.wpx, i, m)), wy.add(ld(b.wpy, i, m)), wz.add(ld(b.wpz, i, m)), FloatVector.broadcast(F, 0.5f * dt));
+        clearPseudo(b, i, m);
+    }
+
+    // ── Calm ─────────────────────────────────────────────────────────────────
 
     @Override
     public void calm(Bodies b, int from, int to) {
-        scalar.calm(b, from, to);
+        Kernels.scalar().calm(b, from, to);
     }
 
-    @Override
-    public void terrain(Bodies b, int from, int to, Grid grid, float dt) {
-        var sc = SCRATCH.get();
-        for (int start = from; start < to; start += CH) {
-            int end = Math.min(to, start + CH);
-            long t0 = System.nanoTime();
-            probe(sc, b, start, end, grid, BAUMGARTE / dt);
-            long t1 = System.nanoTime();
-            for (int g = 1; g < GROUPS; g++) {
-                int n = sc.cursor[g];
-                if (n > 0)
-                    solve(sc, g, g * GS, g * GS + n);
-            }
-            long t2 = System.nanoTime();
-            writeBack(sc, b);
-            long t3 = System.nanoTime();
-            TIME[0] += t1 - t0; TIME[1] += t2 - t1; TIME[2] += t3 - t2;
-            int ct = 0; for (int g = 1; g < GROUPS; g++) ct += sc.cursor[g];
-            TIME[3] += ct; TIME[4] += end - start;
-        }
-    }
-
-    // ── Scalar probe + copy-in ───────────────────────────────────────────────
-
-    /** SIMD: the cell index of each of the eight corners of every piece; scalar: which pieces have a corner in a solid voxel. */
-    private static void prefilter(Scratch sc, Bodies b, int from, int to, Grid grid) {
-        final int[] cc = sc.cornerCell, hits = sc.hits, hitMask = sc.hitMask;
-        final byte[] cells = grid.cells;
-        for (int i = from; i < to; i += L)
-            corners(cc, i - from, b, i, SP.indexInRange(i, to), grid.x0, grid.y0, grid.z0, grid.sx, grid.sz);
-                int nh = 0;
-        final int n = to - from;
-        for (int j = 0; j < n; j++) {
-            int t0 = cells[cc[j]], t1 = cells[cc[CHS + j]], t2 = cells[cc[2 * CHS + j]], t3 = cells[cc[3 * CHS + j]];
-            int t4 = cells[cc[4 * CHS + j]], t5 = cells[cc[5 * CHS + j]], t6 = cells[cc[6 * CHS + j]], t7 = cells[cc[7 * CHS + j]];
-            // solid is type 1: bit 0 set and bit 1 clear
-            int m = (t0 & ~(t0 >> 1) & 1) | ((t1 & ~(t1 >> 1) & 1) << 1) | ((t2 & ~(t2 >> 1) & 1) << 2) | ((t3 & ~(t3 >> 1) & 1) << 3)
-                    | ((t4 & ~(t4 >> 1) & 1) << 4) | ((t5 & ~(t5 >> 1) & 1) << 5) | ((t6 & ~(t6 >> 1) & 1) << 6) | ((t7 & ~(t7 >> 1) & 1) << 7);
-            hits[nh] = from + j;
-            hitMask[nh] = m;
-            nh += (m | -m) >>> 31;
-        }
-        sc.hitCount = nh;
-    }
-
-    private static void corners(int[] cc, int j, Bodies b, int i, VectorMask<Float> in, int x0, int y0, int z0, int sx, int sz) {
-        FloatVector qx = FloatVector.fromArray(SP, b.qx, i, in), qy = FloatVector.fromArray(SP, b.qy, i, in);
-        FloatVector qz = FloatVector.fromArray(SP, b.qz, i, in), qw = FloatVector.fromArray(SP, b.qw, i, in);
-        FloatVector xx = qx.mul(qx), yy = qy.mul(qy), zz = qz.mul(qz), xy = qx.mul(qy), xz = qx.mul(qz), yz = qy.mul(qz);
-        FloatVector wx = qw.mul(qx), wy = qw.mul(qy), wz = qw.mul(qz);
-        FloatVector k = FloatVector.broadcast(SP, CORNER), k2 = FloatVector.broadcast(SP, 2f * CORNER), one = FloatVector.broadcast(SP, 1f);
-        FloatVector two = FloatVector.broadcast(SP, 2f);
-        FloatVector c0x = k.mul(one.sub(two.mul(yy.add(zz)))), c0y = k2.mul(xy.add(wz)), c0z = k2.mul(xz.sub(wy));
-        FloatVector c1x = k2.mul(xy.sub(wz)), c1y = k.mul(one.sub(two.mul(xx.add(zz)))), c1z = k2.mul(yz.add(wx));
-        FloatVector c2x = k2.mul(xz.add(wy)), c2y = k2.mul(yz.sub(wx)), c2z = k.mul(one.sub(two.mul(xx.add(yy))));
-        FloatVector px = FloatVector.fromArray(SP, b.px, i, in).sub((float) x0);
-        FloatVector py = FloatVector.fromArray(SP, b.py, i, in).sub((float) y0);
-        FloatVector pz = FloatVector.fromArray(SP, b.pz, i, in).sub((float) z0);
-        // corner = sa*c0 + sb*c1 + sc*c2, bit 0 = sa, bit 1 = sb, bit 2 = sc
-        FloatVector ABx0 = c0x.add(c1x), ABx1 = c1x.sub(c0x), ABx2 = c0x.sub(c1x);
-        FloatVector ABy0 = c0y.add(c1y), ABy1 = c1y.sub(c0y), ABy2 = c0y.sub(c1y);
-        FloatVector ABz0 = c0z.add(c1z), ABz1 = c1z.sub(c0z), ABz2 = c0z.sub(c1z);
-        for (int corner = 0; corner < 8; corner++) {
-            int ab = corner & 3;
-            FloatVector ax = ab == 0 ? ABx0.neg() : ab == 1 ? ABx2 : ab == 2 ? ABx1 : ABx0;
-            FloatVector ay = ab == 0 ? ABy0.neg() : ab == 1 ? ABy2 : ab == 2 ? ABy1 : ABy0;
-            FloatVector az = ab == 0 ? ABz0.neg() : ab == 1 ? ABz2 : ab == 2 ? ABz1 : ABz0;
-            boolean up = corner >= 4;
-            FloatVector cx = px.add(up ? ax.add(c2x) : ax.sub(c2x));
-            FloatVector cy = py.add(up ? ay.add(c2y) : ay.sub(c2y));
-            FloatVector cz = pz.add(up ? az.add(c2z) : az.sub(c2z));
-            IntVector ix = cx.convert(VectorOperators.F2I, 0).reinterpretAsInts();
-            IntVector iy = cy.convert(VectorOperators.F2I, 0).reinterpretAsInts();
-            IntVector iz = cz.convert(VectorOperators.F2I, 0).reinterpretAsInts();
-            iy.mul(sz).add(iz).mul(sx).add(ix).intoArray(cc, corner * CHS + j);
-        }
-    }
-
-    private static void probe(Scratch sc, Bodies b, int from, int to, Grid grid, float targetScale) {
-        long q0 = System.nanoTime();
-        prefilter(sc, b, from, to, grid);
-        TIME[5] += System.nanoTime() - q0; TIME[6] += sc.hitCount;
-        final int[] cursor = sc.cursor;
-        java.util.Arrays.fill(cursor, 0);
-        final float[] s = sc.s, c = sc.c, t = sc.tmp;
-        final int[] ids = sc.id;
-        final byte[] cells = grid.cells;
-        final int x0 = grid.x0, y0 = grid.y0, z0 = grid.z0, sx = grid.sx, sz = grid.sz;
-
-        final int[] hits = sc.hits, hitMask = sc.hitMask;
-        for (int h = 0; h < sc.hitCount; h++) {
-            int i = hits[h];
-            float qx = b.qx[i], qy = b.qy[i], qz = b.qz[i], qw = b.qw[i];
-            float xx = qx * qx, yy = qy * qy, zz = qz * qz, xy = qx * qy, xz = qx * qz, yz = qy * qz, wxq = qw * qx, wyq = qw * qy, wzq = qw * qz;
-            float c0x = CORNER * (1f - 2f * (yy + zz)), c0y = CORNER * 2f * (xy + wzq), c0z = CORNER * 2f * (xz - wyq);
-            float c1x = CORNER * 2f * (xy - wzq), c1y = CORNER * (1f - 2f * (xx + zz)), c1z = CORNER * 2f * (yz + wxq);
-            float c2x = CORNER * 2f * (xz + wyq), c2y = CORNER * 2f * (yz - wxq), c2z = CORNER * (1f - 2f * (xx + yy));
-
-            float vx = b.vx[i], vy = b.vy[i], vz = b.vz[i], wx = b.wx[i], wy = b.wy[i], wz = b.wz[i];
-            float px = b.px[i], py = b.py[i], pz = b.pz[i];
-
-            int n = 0;
-            for (int mask = hitMask[h]; mask != 0; mask &= mask - 1) {
-                int corner = Integer.numberOfTrailingZeros(mask);
-                float sa = (corner & 1) == 0 ? -1f : 1f, sb = (corner & 2) == 0 ? -1f : 1f, sc2 = (corner & 4) == 0 ? -1f : 1f;
-                float rx = sa * c0x + sb * c1x + sc2 * c2x, ry = sa * c0y + sb * c1y + sc2 * c2y, rz = sa * c0z + sb * c1z + sc2 * c2z;
-                float cpx = px + rx, cpy = py + ry, cpz = pz + rz;
-
-                int ix = Grid.floor(cpx), iy = Grid.floor(cpy), iz = Grid.floor(cpz);
-                int cell = cells[((iy - y0) * sz + (iz - z0)) * sx + (ix - x0)] & 0xFF;
-
-                float velX = vx + (wy * rz - wz * ry), velY = vy + (wz * rx - wx * rz), velZ = vz + (wx * ry - wy * rx);
-                float fx = cpx - ix, fy = cpy - iy, fz = cpz - iz;
-                float best = Float.MAX_VALUE;
-                float ax = 0, ay = 0, az = 0, sign = 1;
-
-                if ((cell & Grid.OPEN_PY) != 0 && velY < MAX_EXIT_SPEED && (1f - fy) - 0.05f < best) { best = (1f - fy) - 0.05f; ax = 0; ay = 1; az = 0; sign = 1; }
-                if ((cell & Grid.OPEN_PX) != 0 && velX < MAX_EXIT_SPEED && 1f - fx < best) { best = 1f - fx; ax = 1; ay = 0; az = 0; sign = 1; }
-                if ((cell & Grid.OPEN_NX) != 0 && -velX < MAX_EXIT_SPEED && fx < best) { best = fx; ax = 1; ay = 0; az = 0; sign = -1; }
-                if ((cell & Grid.OPEN_PZ) != 0 && velZ < MAX_EXIT_SPEED && 1f - fz < best) { best = 1f - fz; ax = 0; ay = 0; az = 1; sign = 1; }
-                if ((cell & Grid.OPEN_NZ) != 0 && -velZ < MAX_EXIT_SPEED && fz < best) { best = fz; ax = 0; ay = 0; az = 1; sign = -1; }
-                if ((cell & Grid.OPEN_NY) != 0 && -velY < MAX_EXIT_SPEED && fy < best) { best = fy; ax = 0; ay = 1; az = 0; sign = -1; }
-                if (best == Float.MAX_VALUE)
-                    continue;
-
-                int o = n++ * 8;
-                t[o] = rx; t[o + 1] = ry; t[o + 2] = rz;
-                t[o + 3] = ax; t[o + 4] = ay; t[o + 5] = az; t[o + 6] = sign;
-                t[o + 7] = Math.max(best + (ay == 1f && sign == 1f ? 0.05f : 0f), 0f);
-            }
-            if (n == 0)
-                continue;
-
-            int pos = n * GS + cursor[n]++;
-            ids[pos] = i;
-            s[VX * TOT + pos] = vx; s[VY * TOT + pos] = vy; s[VZ * TOT + pos] = vz;
-            s[WX * TOT + pos] = wx; s[WY * TOT + pos] = wy; s[WZ * TOT + pos] = wz;
-            s[VPX * TOT + pos] = b.vpx[i]; s[VPY * TOT + pos] = b.vpy[i]; s[VPZ * TOT + pos] = b.vpz[i];
-            s[WPX * TOT + pos] = b.wpx[i]; s[WPY * TOT + pos] = b.wpy[i]; s[WPZ * TOT + pos] = b.wpz[i];
-            s[IM * TOT + pos] = b.invMass[i]; s[II * TOT + pos] = b.invInertia[i];
-            s[MU * TOT + pos] = b.mu[i]; s[RE * TOT + pos] = b.restitution[i];
-            for (int k = 0; k < n; k++) {
-                int base = k * CF * TOT + pos, o = k * 8;
-                c[base + RX * TOT] = t[o]; c[base + RY * TOT] = t[o + 1]; c[base + RZ * TOT] = t[o + 2];
-                c[base + AX * TOT] = t[o + 3]; c[base + AY * TOT] = t[o + 4]; c[base + AZ * TOT] = t[o + 5];
-                c[base + SG * TOT] = t[o + 6];
-                c[base + TG * TOT] = Math.clamp(t[o + 7] - SLOP, 0f, MAX_CORRECTION) * targetScale;
-            }
-        }
-    }
-
-    // ── SIMD solver over one group ───────────────────────────────────────────
-
-    private static void solve(Scratch sc, int g, int from, int to) {
-        for (int p = from; p < to; p += L)
-            solveBlock(sc.s, sc.c, g, p);
-    }
-
-    private static void solveBlock(float[] s, float[] c, int g, int p) {
-        final FloatVector reach = FloatVector.broadcast(SP, CORNER_REACH_SQ);
-        final FloatVector zero = FloatVector.zero(SP), one = FloatVector.broadcast(SP, 1f);
-        final FloatVector bt = FloatVector.broadcast(SP, -BOUNCE_THRESHOLD);
-
-        {
-            FloatVector vx = FloatVector.fromArray(SP, s, VX * TOT + p), vy = FloatVector.fromArray(SP, s, VY * TOT + p), vz = FloatVector.fromArray(SP, s, VZ * TOT + p);
-            FloatVector wx = FloatVector.fromArray(SP, s, WX * TOT + p), wy = FloatVector.fromArray(SP, s, WY * TOT + p), wz = FloatVector.fromArray(SP, s, WZ * TOT + p);
-            final FloatVector im = FloatVector.fromArray(SP, s, IM * TOT + p), ii = FloatVector.fromArray(SP, s, II * TOT + p);
-            final FloatVector mu = FloatVector.fromArray(SP, s, MU * TOT + p), re = FloatVector.fromArray(SP, s, RE * TOT + p);
-
-            for (int k = 0; k < g; k++) {
-                int base = k * CF * TOT + p;
-                FloatVector rx = FloatVector.fromArray(SP, c, base + RX * TOT), ry = FloatVector.fromArray(SP, c, base + RY * TOT), rz = FloatVector.fromArray(SP, c, base + RZ * TOT);
-                FloatVector ax = FloatVector.fromArray(SP, c, base + AX * TOT), ay = FloatVector.fromArray(SP, c, base + AY * TOT), az = FloatVector.fromArray(SP, c, base + AZ * TOT);
-                FloatVector sg = FloatVector.fromArray(SP, c, base + SG * TOT);
-                FloatVector ra = rx.mul(ax).add(ry.mul(ay)).add(rz.mul(az));
-                FloatVector r1 = rx.mul(az).add(ry.mul(ax)).add(rz.mul(ay));
-                FloatVector r2 = rx.mul(ay).add(ry.mul(az)).add(rz.mul(ax));
-                one.div(ii.fma(reach.sub(ra.mul(ra)), im)).intoArray(c, base + KN * TOT);
-                one.div(ii.fma(reach.sub(r1.mul(r1)), im)).intoArray(c, base + K1 * TOT);
-                one.div(ii.fma(reach.sub(r2.mul(r2)), im)).intoArray(c, base + K2 * TOT);
-                FloatVector relx = wy.mul(rz).sub(wz.mul(ry)).add(vx), rely = wz.mul(rx).sub(wx.mul(rz)).add(vy), relz = wx.mul(ry).sub(wy.mul(rx)).add(vz);
-                FloatVector vn = sg.mul(relx.mul(ax).add(rely.mul(ay)).add(relz.mul(az)));
-                zero.blend(re.neg().mul(vn), vn.lt(bt)).intoArray(c, base + BO * TOT);
-                zero.intoArray(c, base + ACN * TOT);
-                zero.intoArray(c, base + AC1 * TOT);
-                zero.intoArray(c, base + AC2 * TOT);
-                zero.intoArray(c, base + ACP * TOT);
-            }
-
-            for (int it = 0; it < ITERATIONS; it++) {
-                for (int k = 0; k < g; k++) {
-                    int base = k * CF * TOT + p;
-                    FloatVector rx = FloatVector.fromArray(SP, c, base + RX * TOT), ry = FloatVector.fromArray(SP, c, base + RY * TOT), rz = FloatVector.fromArray(SP, c, base + RZ * TOT);
-                    FloatVector ax = FloatVector.fromArray(SP, c, base + AX * TOT), ay = FloatVector.fromArray(SP, c, base + AY * TOT), az = FloatVector.fromArray(SP, c, base + AZ * TOT);
-                    FloatVector sg = FloatVector.fromArray(SP, c, base + SG * TOT);
-
-                    FloatVector relx = wy.mul(rz).sub(wz.mul(ry)).add(vx), rely = wz.mul(rx).sub(wx.mul(rz)).add(vy), relz = wx.mul(ry).sub(wy.mul(rx)).add(vz);
-                    FloatVector vd = sg.mul(relx.mul(ax).add(rely.mul(ay)).add(relz.mul(az)));
-                    FloatVector accN = FloatVector.fromArray(SP, c, base + ACN * TOT);
-                    FloatVector nextN = FloatVector.fromArray(SP, c, base + BO * TOT).sub(vd).fma(FloatVector.fromArray(SP, c, base + KN * TOT), accN).max(zero);
-                    nextN.intoArray(c, base + ACN * TOT);
-                    FloatVector m = sg.mul(nextN.sub(accN));
-                    FloatVector ix = ax.mul(m), iy = ay.mul(m), iz = az.mul(m);
-                    vx = ix.fma(im, vx); vy = iy.fma(im, vy); vz = iz.fma(im, vz);
-                    wx = ry.mul(iz).sub(rz.mul(iy)).fma(ii, wx);
-                    wy = rz.mul(ix).sub(rx.mul(iz)).fma(ii, wy);
-                    wz = rx.mul(iy).sub(ry.mul(ix)).fma(ii, wz);
-
-                    FloatVector maxF = mu.mul(nextN), minF = maxF.neg();
-                    // tangent 1: (az, ax, ay)
-                    {
-                        FloatVector vt = wy.mul(rz).sub(wz.mul(ry)).add(vx).mul(az).add(wz.mul(rx).sub(wx.mul(rz)).add(vy).mul(ax)).add(wx.mul(ry).sub(wy.mul(rx)).add(vz).mul(ay));
-                        FloatVector acc = FloatVector.fromArray(SP, c, base + AC1 * TOT);
-                        FloatVector next = vt.neg().fma(FloatVector.fromArray(SP, c, base + K1 * TOT), acc).max(minF).min(maxF);
-                        next.intoArray(c, base + AC1 * TOT);
-                        FloatVector d = next.sub(acc);
-                        FloatVector jx = az.mul(d), jy = ax.mul(d), jz = ay.mul(d);
-                        vx = jx.fma(im, vx); vy = jy.fma(im, vy); vz = jz.fma(im, vz);
-                        wx = ry.mul(jz).sub(rz.mul(jy)).fma(ii, wx);
-                        wy = rz.mul(jx).sub(rx.mul(jz)).fma(ii, wy);
-                        wz = rx.mul(jy).sub(ry.mul(jx)).fma(ii, wz);
-                    }
-                    // tangent 2: (ay, az, ax)
-                    {
-                        FloatVector vt = wy.mul(rz).sub(wz.mul(ry)).add(vx).mul(ay).add(wz.mul(rx).sub(wx.mul(rz)).add(vy).mul(az)).add(wx.mul(ry).sub(wy.mul(rx)).add(vz).mul(ax));
-                        FloatVector acc = FloatVector.fromArray(SP, c, base + AC2 * TOT);
-                        FloatVector next = vt.neg().fma(FloatVector.fromArray(SP, c, base + K2 * TOT), acc).max(minF).min(maxF);
-                        next.intoArray(c, base + AC2 * TOT);
-                        FloatVector d = next.sub(acc);
-                        FloatVector jx = ay.mul(d), jy = az.mul(d), jz = ax.mul(d);
-                        vx = jx.fma(im, vx); vy = jy.fma(im, vy); vz = jz.fma(im, vz);
-                        wx = ry.mul(jz).sub(rz.mul(jy)).fma(ii, wx);
-                        wy = rz.mul(jx).sub(rx.mul(jz)).fma(ii, wy);
-                        wz = rx.mul(jy).sub(ry.mul(jx)).fma(ii, wz);
-                    }
-                }
-            }
-
-            FloatVector vpx = FloatVector.fromArray(SP, s, VPX * TOT + p), vpy = FloatVector.fromArray(SP, s, VPY * TOT + p), vpz = FloatVector.fromArray(SP, s, VPZ * TOT + p);
-            FloatVector wpx = FloatVector.fromArray(SP, s, WPX * TOT + p), wpy = FloatVector.fromArray(SP, s, WPY * TOT + p), wpz = FloatVector.fromArray(SP, s, WPZ * TOT + p);
-            for (int it = 0; it < ITERATIONS; it++) {
-                for (int k = 0; k < g; k++) {
-                    int base = k * CF * TOT + p;
-                    FloatVector target = FloatVector.fromArray(SP, c, base + TG * TOT);
-                    FloatVector accP = FloatVector.fromArray(SP, c, base + ACP * TOT);
-                    VectorMask<Float> active = target.compare(VectorOperators.GT, 0f).or(accP.compare(VectorOperators.NE, 0f));
-                    FloatVector rx = FloatVector.fromArray(SP, c, base + RX * TOT), ry = FloatVector.fromArray(SP, c, base + RY * TOT), rz = FloatVector.fromArray(SP, c, base + RZ * TOT);
-                    FloatVector ax = FloatVector.fromArray(SP, c, base + AX * TOT), ay = FloatVector.fromArray(SP, c, base + AY * TOT), az = FloatVector.fromArray(SP, c, base + AZ * TOT);
-                    FloatVector sg = FloatVector.fromArray(SP, c, base + SG * TOT);
-                    FloatVector vn = sg.mul(wpy.mul(rz).sub(wpz.mul(ry)).add(vpx).mul(ax).add(wpz.mul(rx).sub(wpx.mul(rz)).add(vpy).mul(ay)).add(wpx.mul(ry).sub(wpy.mul(rx)).add(vpz).mul(az)));
-                    FloatVector next = target.sub(vn).fma(FloatVector.fromArray(SP, c, base + KN * TOT), accP).max(zero);
-                    next = accP.blend(next, active);
-                    next.intoArray(c, base + ACP * TOT);
-                    FloatVector m = sg.mul(next.sub(accP));
-                    FloatVector ix = ax.mul(m), iy = ay.mul(m), iz = az.mul(m);
-                    vpx = ix.fma(im, vpx); vpy = iy.fma(im, vpy); vpz = iz.fma(im, vpz);
-                    wpx = ry.mul(iz).sub(rz.mul(iy)).fma(ii, wpx);
-                    wpy = rz.mul(ix).sub(rx.mul(iz)).fma(ii, wpy);
-                    wpz = rx.mul(iy).sub(ry.mul(ix)).fma(ii, wpz);
-                }
-            }
-
-            vx.intoArray(s, VX * TOT + p); vy.intoArray(s, VY * TOT + p); vz.intoArray(s, VZ * TOT + p);
-            wx.intoArray(s, WX * TOT + p); wy.intoArray(s, WY * TOT + p); wz.intoArray(s, WZ * TOT + p);
-            vpx.intoArray(s, VPX * TOT + p); vpy.intoArray(s, VPY * TOT + p); vpz.intoArray(s, VPZ * TOT + p);
-            wpx.intoArray(s, WPX * TOT + p); wpy.intoArray(s, WPY * TOT + p); wpz.intoArray(s, WPZ * TOT + p);
-        }
-    }
-
-    // ── Scalar copy-out ──────────────────────────────────────────────────────
-
-    private static void writeBack(Scratch sc, Bodies b) {
-        final float[] s = sc.s;
-        final int[] ids = sc.id;
-        for (int g = 1; g < GROUPS; g++) {
-            int base = g * GS, n = sc.cursor[g];
-            for (int pos = base; pos < base + n; pos++) {
-                int i = ids[pos];
-                b.vx[i] = s[VX * TOT + pos]; b.vy[i] = s[VY * TOT + pos]; b.vz[i] = s[VZ * TOT + pos];
-                b.wx[i] = s[WX * TOT + pos]; b.wy[i] = s[WY * TOT + pos]; b.wz[i] = s[WZ * TOT + pos];
-                b.vpx[i] = s[VPX * TOT + pos]; b.vpy[i] = s[VPY * TOT + pos]; b.vpz[i] = s[VPZ * TOT + pos];
-                b.wpx[i] = s[WPX * TOT + pos]; b.wpy[i] = s[WPY * TOT + pos]; b.wpz[i] = s[WPZ * TOT + pos];
-                b.touch[i] = 1f;
-            }
-        }
-    }
 }
