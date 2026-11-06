@@ -597,9 +597,9 @@ public final class VectorKernels implements Kernels {
     public void integrate(Bodies b, int from, int to, float dt) {
         int bound = from + F.loopBound(to - from);
         for (int i = from; i < bound; i += L)
-            integrateVector(b, i, null, dt);
+            integrateBlock(b, i, dt);
         if (bound < to)
-            integrateVector(b, bound, F.indexInRange(bound, to), dt);
+            integrateTail(b, bound, F.indexInRange(bound, to), dt);
     }
 
     /** Same bit trick and Newton steps as {@code ScalarKernels.inverseSquareRoot}. */
@@ -611,52 +611,73 @@ public final class VectorKernels implements Kernels {
         return y;
     }
 
-    private static void integrateVector(Bodies b, int i, VectorMask<Float> m, float dt) {
-        final FloatVector one = FloatVector.broadcast(F, 1f);
-        FloatVector vx = ld(b.vx, i, m), vy = ld(b.vy, i, m), vz = ld(b.vz, i, m);
-        FloatVector wx = ld(b.wx, i, m), wy = ld(b.wy, i, m), wz = ld(b.wz, i, m);
-
+    /** One full vector of pieces (the masked twin below handles the last, partial one). */
+    private static void integrateBlock(Bodies b, int i, float dt) {
+        FloatVector vx = FloatVector.fromArray(F, b.vx, i), vy = FloatVector.fromArray(F, b.vy, i), vz = FloatVector.fromArray(F, b.vz, i);
+        FloatVector wx = FloatVector.fromArray(F, b.wx, i), wy = FloatVector.fromArray(F, b.wy, i), wz = FloatVector.fromArray(F, b.wz, i);
         FloatVector speedSquared = vx.fma(vx, vy.fma(vy, vz.mul(vz)));
         FloatVector spinSquared = wx.fma(wx, wy.fma(wy, wz.mul(wz)));
-        VectorMask<Float> fast = speedSquared.compare(VectorOperators.GT, MAX_SPEED * MAX_SPEED);
-        VectorMask<Float> spinning = spinSquared.compare(VectorOperators.GT, MAX_SPIN * MAX_SPIN);
-        if (fast.or(spinning).anyTrue()) {
-            integrateClamped(b, i, m, dt);
+        if (speedSquared.compare(VectorOperators.GT, MAX_SPEED * MAX_SPEED).or(spinSquared.compare(VectorOperators.GT, MAX_SPIN * MAX_SPIN)).anyTrue()) {
+            integrateClamped(b, i, null, dt);
             return;
         }
 
-        final float h = 0.5f * dt;
-        final FloatVector dtv = FloatVector.broadcast(F, dt), hh = FloatVector.broadcast(F, h);
-        position(b, i, m, vx, vy, vz, dtv);
-        rotate(b, i, m, wx.add(ld(b.wpx, i, m)), wy.add(ld(b.wpy, i, m)), wz.add(ld(b.wpz, i, m)), hh);
-        clearPseudo(b, i, m);
-    }
+        final FloatVector dtv = FloatVector.broadcast(F, dt), hh = FloatVector.broadcast(F, 0.5f * dt);
+        vx.add(FloatVector.fromArray(F, b.vpx, i)).fma(dtv, FloatVector.fromArray(F, b.px, i)).intoArray(b.px, i);
+        vy.add(FloatVector.fromArray(F, b.vpy, i)).fma(dtv, FloatVector.fromArray(F, b.py, i)).intoArray(b.py, i);
+        vz.add(FloatVector.fromArray(F, b.vpz, i)).fma(dtv, FloatVector.fromArray(F, b.pz, i)).intoArray(b.pz, i);
 
-    private static void position(Bodies b, int i, VectorMask<Float> m, FloatVector vx, FloatVector vy, FloatVector vz, FloatVector dtv) {
-        st(vx.add(ld(b.vpx, i, m)).fma(dtv, ld(b.px, i, m)), b.px, i, m);
-        st(vy.add(ld(b.vpy, i, m)).fma(dtv, ld(b.py, i, m)), b.py, i, m);
-        st(vz.add(ld(b.vpz, i, m)).fma(dtv, ld(b.pz, i, m)), b.pz, i, m);
-    }
-
-    private static void rotate(Bodies b, int i, VectorMask<Float> m, FloatVector ax, FloatVector ay, FloatVector az, FloatVector hh) {
+        // q += dt/2 * (w, 0) * q, renormalised
+        FloatVector ax = wx.add(FloatVector.fromArray(F, b.wpx, i)), ay = wy.add(FloatVector.fromArray(F, b.wpy, i)), az = wz.add(FloatVector.fromArray(F, b.wpz, i));
         FloatVector nax = ax.neg(), nay = ay.neg(), naz = az.neg();
-        FloatVector qx = ld(b.qx, i, m), qy = ld(b.qy, i, m), qz = ld(b.qz, i, m), qw = ld(b.qw, i, m);
+        FloatVector qx = FloatVector.fromArray(F, b.qx, i), qy = FloatVector.fromArray(F, b.qy, i), qz = FloatVector.fromArray(F, b.qz, i), qw = FloatVector.fromArray(F, b.qw, i);
         FloatVector nqx = ax.fma(qw, ay.fma(qz, naz.mul(qy))).fma(hh, qx);
         FloatVector nqy = nax.fma(qz, ay.fma(qw, az.mul(qx))).fma(hh, qy);
         FloatVector nqz = ax.fma(qy, nay.fma(qx, az.mul(qw))).fma(hh, qz);
         FloatVector nqw = nax.fma(qx, nay.fma(qy, naz.mul(qz))).fma(hh, qw);
         // The quaternion is within a few percent of unit length, where 1/sqrt(n) is 1.5 - n/2 to better than 1e-3
         FloatVector inv = FloatVector.broadcast(F, -0.5f).fma(nqx.fma(nqx, nqy.fma(nqy, nqz.fma(nqz, nqw.mul(nqw)))), FloatVector.broadcast(F, 1.5f));
-        st(nqx.mul(inv), b.qx, i, m); st(nqy.mul(inv), b.qy, i, m); st(nqz.mul(inv), b.qz, i, m); st(nqw.mul(inv), b.qw, i, m);
+        nqx.mul(inv).intoArray(b.qx, i); nqy.mul(inv).intoArray(b.qy, i); nqz.mul(inv).intoArray(b.qz, i); nqw.mul(inv).intoArray(b.qw, i);
+
+        final FloatVector zero = FloatVector.zero(F);
+        zero.intoArray(b.vpx, i); zero.intoArray(b.vpy, i); zero.intoArray(b.vpz, i);
+        zero.intoArray(b.wpx, i); zero.intoArray(b.wpy, i); zero.intoArray(b.wpz, i);
     }
 
-    private static void clearPseudo(Bodies b, int i, VectorMask<Float> m) {
-        FloatVector zero = FloatVector.zero(F);
-        st(zero, b.vpx, i, m); st(zero, b.vpy, i, m); st(zero, b.vpz, i, m);
-        st(zero, b.wpx, i, m); st(zero, b.wpy, i, m); st(zero, b.wpz, i, m);
+    private static void integrateTail(Bodies b, int i, VectorMask<Float> m, float dt) {
+        // (generated from integrateBlock by adding the mask to every access)
+        FloatVector vx = FloatVector.fromArray(F, b.vx, i, m), vy = FloatVector.fromArray(F, b.vy, i, m), vz = FloatVector.fromArray(F, b.vz, i, m);
+        FloatVector wx = FloatVector.fromArray(F, b.wx, i, m), wy = FloatVector.fromArray(F, b.wy, i, m), wz = FloatVector.fromArray(F, b.wz, i, m);
+        FloatVector speedSquared = vx.fma(vx, vy.fma(vy, vz.mul(vz)));
+        FloatVector spinSquared = wx.fma(wx, wy.fma(wy, wz.mul(wz)));
+        if (speedSquared.compare(VectorOperators.GT, MAX_SPEED * MAX_SPEED).or(spinSquared.compare(VectorOperators.GT, MAX_SPIN * MAX_SPIN)).anyTrue()) {
+            integrateClamped(b, i, m, dt);
+            return;
+        }
+
+        final FloatVector dtv = FloatVector.broadcast(F, dt), hh = FloatVector.broadcast(F, 0.5f * dt);
+        vx.add(FloatVector.fromArray(F, b.vpx, i, m)).fma(dtv, FloatVector.fromArray(F, b.px, i, m)).intoArray(b.px, i, m);
+        vy.add(FloatVector.fromArray(F, b.vpy, i, m)).fma(dtv, FloatVector.fromArray(F, b.py, i, m)).intoArray(b.py, i, m);
+        vz.add(FloatVector.fromArray(F, b.vpz, i, m)).fma(dtv, FloatVector.fromArray(F, b.pz, i, m)).intoArray(b.pz, i, m);
+
+        // q += dt/2 * (w, 0) * q, renormalised
+        FloatVector ax = wx.add(FloatVector.fromArray(F, b.wpx, i, m)), ay = wy.add(FloatVector.fromArray(F, b.wpy, i, m)), az = wz.add(FloatVector.fromArray(F, b.wpz, i, m));
+        FloatVector nax = ax.neg(), nay = ay.neg(), naz = az.neg();
+        FloatVector qx = FloatVector.fromArray(F, b.qx, i, m), qy = FloatVector.fromArray(F, b.qy, i, m), qz = FloatVector.fromArray(F, b.qz, i, m), qw = FloatVector.fromArray(F, b.qw, i, m);
+        FloatVector nqx = ax.fma(qw, ay.fma(qz, naz.mul(qy))).fma(hh, qx);
+        FloatVector nqy = nax.fma(qz, ay.fma(qw, az.mul(qx))).fma(hh, qy);
+        FloatVector nqz = ax.fma(qy, nay.fma(qx, az.mul(qw))).fma(hh, qz);
+        FloatVector nqw = nax.fma(qx, nay.fma(qy, naz.mul(qz))).fma(hh, qw);
+        // The quaternion is within a few percent of unit length, where 1/sqrt(n) is 1.5 - n/2 to better than 1e-3
+        FloatVector inv = FloatVector.broadcast(F, -0.5f).fma(nqx.fma(nqx, nqy.fma(nqy, nqz.fma(nqz, nqw.mul(nqw)))), FloatVector.broadcast(F, 1.5f));
+        nqx.mul(inv).intoArray(b.qx, i, m); nqy.mul(inv).intoArray(b.qy, i, m); nqz.mul(inv).intoArray(b.qz, i, m); nqw.mul(inv).intoArray(b.qw, i, m);
+
+        final FloatVector zero = FloatVector.zero(F);
+        zero.intoArray(b.vpx, i, m); zero.intoArray(b.vpy, i, m); zero.intoArray(b.vpz, i, m);
+        zero.intoArray(b.wpx, i, m); zero.intoArray(b.wpy, i, m); zero.intoArray(b.wpz, i, m);
     }
 
-    /** The rare case: some piece moves or spins faster than the limits, so velocities are clamped (and stored) first. */
+    /** The rare case: some piece moves or spins faster than the limits. Does the whole step for {@code m} (null: all lanes). */
     private static void integrateClamped(Bodies b, int i, VectorMask<Float> m, float dt) {
         FloatVector vx = ld(b.vx, i, m), vy = ld(b.vy, i, m), vz = ld(b.vz, i, m);
         FloatVector wx = ld(b.wx, i, m), wy = ld(b.wy, i, m), wz = ld(b.wz, i, m);
@@ -670,9 +691,23 @@ public final class VectorKernels implements Kernels {
         wx = wx.mul(kw, spinning); wy = wy.mul(kw, spinning); wz = wz.mul(kw, spinning);
         st(vx, b.vx, i, m); st(vy, b.vy, i, m); st(vz, b.vz, i, m);
         st(wx, b.wx, i, m); st(wy, b.wy, i, m); st(wz, b.wz, i, m);
-        position(b, i, m, vx, vy, vz, FloatVector.broadcast(F, dt));
-        rotate(b, i, m, wx.add(ld(b.wpx, i, m)), wy.add(ld(b.wpy, i, m)), wz.add(ld(b.wpz, i, m)), FloatVector.broadcast(F, 0.5f * dt));
-        clearPseudo(b, i, m);
+
+        final FloatVector dtv = FloatVector.broadcast(F, dt), hh = FloatVector.broadcast(F, 0.5f * dt);
+        st(vx.add(ld(b.vpx, i, m)).fma(dtv, ld(b.px, i, m)), b.px, i, m);
+        st(vy.add(ld(b.vpy, i, m)).fma(dtv, ld(b.py, i, m)), b.py, i, m);
+        st(vz.add(ld(b.vpz, i, m)).fma(dtv, ld(b.pz, i, m)), b.pz, i, m);
+        FloatVector ax = wx.add(ld(b.wpx, i, m)), ay = wy.add(ld(b.wpy, i, m)), az = wz.add(ld(b.wpz, i, m));
+        FloatVector nax = ax.neg(), nay = ay.neg(), naz = az.neg();
+        FloatVector qx = ld(b.qx, i, m), qy = ld(b.qy, i, m), qz = ld(b.qz, i, m), qw = ld(b.qw, i, m);
+        FloatVector nqx = ax.fma(qw, ay.fma(qz, naz.mul(qy))).fma(hh, qx);
+        FloatVector nqy = nax.fma(qz, ay.fma(qw, az.mul(qx))).fma(hh, qy);
+        FloatVector nqz = ax.fma(qy, nay.fma(qx, az.mul(qw))).fma(hh, qz);
+        FloatVector nqw = nax.fma(qx, nay.fma(qy, naz.mul(qz))).fma(hh, qw);
+        FloatVector inv = FloatVector.broadcast(F, -0.5f).fma(nqx.fma(nqx, nqy.fma(nqy, nqz.fma(nqz, nqw.mul(nqw)))), FloatVector.broadcast(F, 1.5f));
+        st(nqx.mul(inv), b.qx, i, m); st(nqy.mul(inv), b.qy, i, m); st(nqz.mul(inv), b.qz, i, m); st(nqw.mul(inv), b.qw, i, m);
+        FloatVector zero = FloatVector.zero(F);
+        st(zero, b.vpx, i, m); st(zero, b.vpy, i, m); st(zero, b.vpz, i, m);
+        st(zero, b.wpx, i, m); st(zero, b.wpy, i, m); st(zero, b.wpz, i, m);
     }
 
     // ── Calm ─────────────────────────────────────────────────────────────────

@@ -38,15 +38,15 @@ public final class Bodies {
     public Bodies(int capacity) {
         this.capacity = capacity;
         this.awake = capacity;
-        px = new float[capacity]; py = new float[capacity]; pz = new float[capacity];
-        vx = new float[capacity]; vy = new float[capacity]; vz = new float[capacity];
-        wx = new float[capacity]; wy = new float[capacity]; wz = new float[capacity];
-        qx = new float[capacity]; qy = new float[capacity]; qz = new float[capacity]; qw = new float[capacity];
-        vpx = new float[capacity]; vpy = new float[capacity]; vpz = new float[capacity];
-        wpx = new float[capacity]; wpy = new float[capacity]; wpz = new float[capacity];
-        invMass = new float[capacity]; invInertia = new float[capacity];
-        drag = new float[capacity]; mu = new float[capacity]; restitution = new float[capacity];
-        touch = new float[capacity];
+        px = row(); py = row(); pz = row();
+        vx = row(); vy = row(); vz = row();
+        wx = row(); wy = row(); wz = row();
+        qx = row(); qy = row(); qz = row(); qw = row();
+        vpx = row(); vpy = row(); vpz = row();
+        wpx = row(); wpy = row(); wpz = row();
+        invMass = row(); invInertia = row();
+        drag = row(); mu = row(); restitution = row();
+        touch = row();
         hard = new boolean[capacity];
         calm = new int[capacity];
         id = new int[capacity];
@@ -59,6 +59,17 @@ public final class Bodies {
                 invMass, invInertia, drag, mu, restitution, touch};
         booleans = new boolean[][]{hard};
         ints = new int[][]{calm, id};
+    }
+
+    private int rows;
+
+    /**
+     * A new component array. Each is staggered by a few cache lines of padding: whole-array sizes that are multiples of
+     * 4 KB (1024 pieces, 16384, ...) would otherwise put element i of every array in the same cache set, and the 30-odd
+     * streams a kernel reads would evict each other.
+     */
+    private float[] row() {
+        return new float[capacity + 16 * (rows++ % 16)];
     }
 
     /** Exchanges two slots completely, keeping the id/slot maps consistent. */
