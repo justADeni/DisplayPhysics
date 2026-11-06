@@ -21,11 +21,6 @@ public class Run {
             if (++reps % 20 == 0)
                 System.out.printf("%.1f%n", ns);
         }
-        try {
-            long[] tm = (long[]) Class.forName("com.github.justadeni.displayphysics.sim.VectorKernels").getField("TIME").get(null);
-            if (tm[7] > 0) System.out.printf("per candidate: cull+probe split cull %.1f probe %.1f | per solved piece: load %.1f contacts %.1f iterate %.1f finish %.1f | candidates %d solved %d slots/vec %.2f%n",
-                    tm[0] / (double) tm[5], tm[1] / (double) tm[5], tm[2] / (double) tm[7], tm[3] / (double) tm[7], tm[4] / (double) tm[7], tm[6] / (double) tm[7], tm[5], tm[7], tm[8] / (tm[7] / 16.0));
-        } catch (ReflectiveOperationException e) { }
         System.out.printf("%s %s %d %s: best %.1f ns/piece%n", a[0], a[1], n, a[3], best);
     }
 }

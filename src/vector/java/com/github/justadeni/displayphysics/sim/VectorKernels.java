@@ -31,6 +31,8 @@ public final class VectorKernels implements Kernels {
     /** Pieces per chunk. */
     private static final int CHUNK = 2048;
     private static final int CAP = CHUNK + 2 * L;
+    /** Group vectors solved side by side, so their dependency chains overlap in the core. */
+    private static final int CONTEXTS = 3;
 
     // Scratch floats per contact slot (one vector each)
     private static final int RX = 0, RY = 1, RZ = 2, NX = 3, NY = 4, NZ = 5, AX = 6, AY = 7, AZ = 8, KN = 9, K1 = 10, K2 = 11,
@@ -62,7 +64,12 @@ public final class VectorKernels implements Kernels {
         final int[] hitN = new int[9];
         final int[] idx = new int[L], row = new int[L], pi = new int[2 * L];
         final float[] pc = new float[18 * L], dn = new float[ND * CAP];
-        final Ctx x0 = new Ctx(), x1 = new Ctx();
+        final Ctx[] cx = new Ctx[CONTEXTS];
+
+        Scratch() {
+            for (int j = 0; j < CONTEXTS; j++)
+                cx[j] = new Ctx();
+        }
     }
 
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
@@ -92,18 +99,15 @@ public final class VectorKernels implements Kernels {
         Scratch s = SCRATCH.get();
         for (int base = from; base < to; base += CHUNK) {
             int end = Math.min(base + CHUNK, to);
-            long t0 = PROFILE ? System.nanoTime() : 0;
             int nc = cull(b, grid, s, base, end);
-            if (PROFILE) { long t = System.nanoTime(); TIME[0] += t - t0; t0 = t; TIME[5] += nc; }
             if (nc == 0)
                 continue;
             Arrays.fill(s.hitN, 0);
             for (int j = 0; j < nc; j += L)
                 probe(grid, s, j, nc);
-            if (PROFILE) { long t = System.nanoTime(); TIME[1] += t - t0; }
             for (int k = 1; k <= 8; k++) {
                 int n = s.hitN[k];
-                for (int h = 0; h < n; h += 2 * L)
+                for (int h = 0; h < n; h += CONTEXTS * L)
                     solve(b, grid, s, k, h, n, dt);
             }
         }
@@ -221,43 +225,28 @@ public final class VectorKernels implements Kernels {
         IntVector.fromArray(I, bitsRow, 0).lanewise(VectorOperators.OR, 1 << c, solid).intoArray(bitsRow, 0);
     }
 
-    /** Debug: ns in cull, probe, load, contacts, iterate, finish; candidates; pieces solved. */
-    public static final boolean PROFILE = Boolean.getBoolean("dp.profile");
-    public static final long[] TIME = new long[9];
     private static final int TYPE_MASK = Grid.TYPE_MASK;
 
     private static void solve(Bodies b, Grid grid, Scratch s, int k, int h0, int n, float dt) {
-        final Ctx x = s.x0, y = s.x1;
-        final boolean two = h0 + L < n;
-        long t0 = PROFILE ? System.nanoTime() : 0;
-        load(b, s, x, k, h0, n);
-        if (two)
-            load(b, s, y, k, h0 + L, n);
-        if (PROFILE) { long t = System.nanoTime(); TIME[2] += t - t0; t0 = t; }
+        final Ctx[] cx = s.cx;
+        // Up to CONTEXTS vectors of the group, solved side by side
+        final int m = Math.min(CONTEXTS, (n - h0 + L - 1) / L);
+        for (int j = 0; j < m; j++)
+            load(b, s, cx[j], k, h0 + j * L, n);
         final float scale = BAUMGARTE / dt;
-        for (int c = 0; c < k; c++) {
-            contact(grid, x, c, scale);
-            if (two)
-                contact(grid, y, c, scale);
-        }
-        if (PROFILE) { long t = System.nanoTime(); TIME[3] += t - t0; t0 = t; }
+        for (int c = 0; c < k; c++)
+            for (int j = 0; j < m; j++)
+                contact(grid, cx[j], c, scale);
         for (int it = 0; it < ITERATIONS; it++)
-            for (int c = 0; c < k; c++) {
-                iterateStep(x, c);
-                if (two)
-                    iterateStep(y, c);
-            }
-        if (PROFILE) { long t = System.nanoTime(); TIME[4] += t - t0; t0 = t; }
+            for (int c = 0; c < k; c++)
+                for (int j = 0; j < m; j++)
+                    iterateStep(cx[j], c);
         for (int it = 0; it < ITERATIONS; it++)
-            for (int c = 0; c < k; c++) {
-                splitStep(x, c);
-                if (two)
-                    splitStep(y, c);
-            }
-        store(b, x);
-        if (two)
-            store(b, y);
-        if (PROFILE) { long t = System.nanoTime(); TIME[6] += t - t0; TIME[7] += Math.min(2 * L, n - h0) * 1L; TIME[8] += k; }
+            for (int c = 0; c < k; c++)
+                for (int j = 0; j < m; j++)
+                    splitStep(cx[j], c);
+        for (int j = 0; j < m; j++)
+            store(b, cx[j]);
     }
 
     /** Gathers the pieces of one group vector and the rotation columns into the state rows. */

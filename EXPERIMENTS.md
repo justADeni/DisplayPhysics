@@ -57,3 +57,32 @@ batch size** (and not slower anywhere that matters), then the same in the whole 
   Commit your work on that branch. Save JMH JSON under `benchmarks/` in your worktree.
 - Iterate: measure, profile (`-XX:+PrintCompilation`, `-XX:+UnlockDiagnosticVMOptions -XX:+PrintInlining`, look for
   `COMPILE SKIPPED` and allocations), change one thing, measure again. Keep a log of what each change did to ns/piece.
+
+## exp/merged: the three branches in one kernel
+
+`VectorKernels` = chunked's structure (small static passes talking through scratch rows, NEAR cull, listing by contact
+count) + hybrid's "only look at what can be touched" + compact's compress for the candidates, plus new pieces:
+
+- `Grid.nbr`: per voxel a 27-bit mask of which voxels around it are solid *with an open face* (those are the only ones that
+  can give a contact). Zero = nothing within one voxel (the cull); otherwise ONE gather per piece replaces the eight corner
+  gathers of the probe (a corner is a bit test). Pieces are listed by how many corners that is (k), and the way out of the
+  voxel is chosen once per contact slot on dense lanes (`locate` / `select` / `derive`), not for all 8 corners of everything.
+  A lane whose exposed voxel offers no way out gets a dead slot (all factors zero), which is exactly what scalar does.
+- Corner offsets and floors are evaluated exactly as ScalarKernels does (`(+-c0 +-c1) +- c2`, floor on absolute
+  coordinates): corners on a voxel face fall the same way (2 of 20011 resting pieces differed by 0.13 before that).
+- The iterate step computes the contact point velocity once; an impulse along axis e changes its component along f by
+  `-invInertia*j*(r.e)*(r.f)` (exact for orthogonal axes), so v and w are updated once per step instead of three times.
+- `CONTEXTS` (3) group vectors are solved side by side: the chains are latency bound.
+- Candidates (index, q, p) are compressed in the cull; the group vectors gather their state from the arrays.
+- `Bodies` arrays are staggered by 0..15 cache lines of padding: 1024 / 16384 pieces make every array a multiple of 4 KB
+  and the 30 streams of a kernel then alias in the L1/L2 sets (integrate 3.2 ns -> 1.2 ns/piece, forces 0.8 -> 0.4).
+- integrate/forces: one method body per full vector (a helper taking vectors is not inlined and boxes), masked twin for
+  the tail, hoisted negations, Taylor step and bit-trick inverse square root as in the scalar kernel, clamp path separate.
+  forces skips the buoyancy lookup when `Grid.liquid` is false.
+- Not used: compact's expand write-back and per-lane slot compaction (grouping by k already fills the lanes: resting 7x),
+  a per-chunk density switch (nothing to switch to).
+
+Log (terrain ns/piece, 1 thread on CPU 20, C2, mixed 16384 / resting 16384; scalar 64 / 549):
+first merge 34.5 / 127.7 (vectors boxed: `floor` helper not inlined, `contact` too big for C2) -> helpers inlined 21.0 / 106.7
+-> contact split in locate/select/derive 19.6 / 99.2 -> two contexts 19.3 / 86.2 -> coupled impulse step 19.3 / 76.4
+-> neighbourhood mask probe + dense candidates 17.3 / 73.3 -> staggered arrays 17.8 / 72.1 -> three contexts 17.0 / 73.4.
