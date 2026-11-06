@@ -9,17 +9,7 @@ import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
-/**
- * Line-of-sight for a viewer, a vector of pieces at a time. The cheap tests (distance, view cone) run for
- * {@code L} pieces at once and shrink the batch to the pieces that need a line. Those are marched together,
- * one grid sample per step for every lane, with the grid read through a small software gather (the bytes are
- * not gatherable). A lane drops out when its line is blocked or finished; the batch goes on until all have.
- *
- * <p>The sets of lanes are kept as bit sets ({@code long}), which is what {@link VectorMask#toLong()} and
- * {@link VectorMask#fromLong} convert to and from for free.
- */
 final class VectorVisibility {
-
     private static final VectorSpecies<Float> F = FloatVector.SPECIES_PREFERRED;
     private static final VectorSpecies<Integer> I = IntVector.SPECIES_PREFERRED;
     private static final int L = F.length();
@@ -76,7 +66,6 @@ final class VectorVisibility {
         }
     }
 
-    /** Marches the line to one sample point of every lane in {@code lanes}; returns the lanes whose line is clear. */
     private static long march(FloatVector cx, FloatVector cy, FloatVector cz, int point, long lanes,
                               float ex, float ey, float ez, Grid grid, byte[] occupancy, float spacing, Scratch scratch) {
         var mask = VectorMask.fromLong(F, lanes);
@@ -85,7 +74,6 @@ final class VectorVisibility {
         var rz = cz.add(ScalarKernels.SIGHT_POINTS[3 * point + 2]).sub(ez);
         var length = rz.fma(rz, ry.fma(ry, rx.mul(rx))).sqrt();
 
-        // steps = max(1, ceil(length / spacing))
         var quotient = length.div(spacing);
         var truncated = (IntVector) quotient.convert(VectorOperators.F2I, 0);
         var below = ((FloatVector) truncated.convert(VectorOperators.I2F, 0)).compare(VectorOperators.LT, quotient);
@@ -105,7 +93,6 @@ final class VectorVisibility {
             var fy = ry.mul(f).add(ey).sub(gy);
             var fz = rz.mul(f).add(ez).sub(gz);
             var stepping = VectorMask.fromLong(F, alive).and(steps.compare(VectorOperators.GT, s).cast(F));
-            // Outside the tracked area nothing is known, so nothing blocks
             var inside = stepping
                     .and(fx.compare(VectorOperators.GE, 0f)).and(fx.compare(VectorOperators.LT, sx))
                     .and(fy.compare(VectorOperators.GE, 0f)).and(fy.compare(VectorOperators.LT, sy))
@@ -116,7 +103,6 @@ final class VectorVisibility {
                 var yi = (IntVector) fy.convert(VectorOperators.F2I, 0);
                 var zi = (IntVector) fz.convert(VectorOperators.F2I, 0);
                 yi.mul(grid.sz).add(zi).mul(grid.sx).add(xi).intoArray(index, 0);
-                // Software gather: the grid is bytes
                 for (long bits = sample; bits != 0; bits &= bits - 1) {
                     int l = Long.numberOfTrailingZeros(bits);
                     int at = index[l];
@@ -136,5 +122,4 @@ final class VectorVisibility {
         }
         return alive;
     }
-
 }

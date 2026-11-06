@@ -11,8 +11,6 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SimulatorTest {
-
-    /** Solid below y = 64, air above. */
     private static final TerrainSource FLAT = new TerrainSource() {
         public byte classify(int x, int y, int z) { return y < 64 ? SOLID : AIR; }
         public int minY() { return -64; }
@@ -21,7 +19,6 @@ class SimulatorTest {
 
     private record Cell(int x, int y, int z, boolean hard, float mass) {}
 
-    /** A 1x1 column eight blocks high with a 3x3 cap on top, standing on the ground. */
     private static List<Cell> tower() {
         var cells = new ArrayList<Cell>();
         for (int i = 0; i < 8; i++)
@@ -80,8 +77,6 @@ class SimulatorTest {
         return at;
     }
 
-    // ── XYZ ──────────────────────────────────────────────────────────────────
-
     @Test
     void packedPositionsRoundTripAcrossTheWholeWorld() {
         int[] horizontal = {XYZ.MIN_XZ, -30_000_000, -1_000, -17, -1, 0, 1, 16, 1_000, 30_000_000, XYZ.MAX_XZ};
@@ -103,8 +98,6 @@ class SimulatorTest {
         assertEquals(67, XYZ.y(moved));
         assertEquals(-1, XYZ.z(moved));
     }
-
-    // ── Solid modes ──────────────────────────────────────────────────────────
 
     @Test
     void rigidAssemblyTipsOverAndRestsOnTheGround() {
@@ -149,8 +142,6 @@ class SimulatorTest {
         }
     }
 
-    // ── Explosions ───────────────────────────────────────────────────────────
-
     @Test
     void explosionThrowsEveryPieceAwayFromTheCentre() {
         var cells = cube(3, 64);
@@ -158,7 +149,6 @@ class SimulatorTest {
         assertTrue(sim.broken());
         run(sim);
 
-        // The cube's middle is (1.5, 65.5, 1.5): pieces end up further from it than they started
         double before = IntStream.range(0, cells.size()).mapToDouble(i -> distance(cells.get(i).x() + 0.5, cells.get(i).z() + 0.5, 1.5, 1.5)).average().orElseThrow();
         double after = IntStream.range(0, cells.size()).mapToDouble(i -> distance(centre(sim, i)[0], centre(sim, i)[2], 1.5, 1.5)).average().orElseThrow();
         assertTrue(after > before + 2, "pieces spread from " + before + " to " + after);
@@ -166,7 +156,6 @@ class SimulatorTest {
 
     @Test
     void explosionOnlyThrowsPiecesNearTheEpicenter() {
-        // A blast at the foot of the tower reaches the bottom few blocks only
         var sim = simulator(tower(), null, Mode.explode(Blast.at(0.5, 64.5, 0.5f, 2f).force(14f)));
         assertFalse(sim.asleep(0), "a piece at the epicenter is thrown");
         assertFalse(sim.asleep(2), "a piece within the radius is thrown");
@@ -191,7 +180,6 @@ class SimulatorTest {
     @Test
     void directionalExplosionFliesTheWayItIsAimed() {
         var cells = cube(3, 64);
-        // Like a wall hit by a projectile travelling along +x
         var blast = Blast.everything().aim(Blast.Aim.cone(1, 0, 0, (float) Math.toRadians(20))).force(16f).lift(0f);
         var sim = simulator(cells, null, Mode.explode(blast));
         run(sim);
@@ -219,5 +207,4 @@ class SimulatorTest {
     private static double distance(double x, double z, double cx, double cz) {
         return Math.hypot(x - cx, z - cz);
     }
-
 }

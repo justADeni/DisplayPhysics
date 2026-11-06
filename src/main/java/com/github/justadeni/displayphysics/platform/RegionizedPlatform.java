@@ -8,9 +8,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.CompletableFuture;
 
-/** Paper and Folia: a player may only be read on the thread that owns them. */
 public final class RegionizedPlatform implements Platform {
-
     private final Plugin plugin;
 
     public RegionizedPlatform(Plugin plugin) {
@@ -24,7 +22,6 @@ public final class RegionizedPlatform implements Platform {
 
     @Override
     public CompletableFuture<Location> locate(Player player) {
-        // Already on the right thread: no hop, the answer is there at once
         if (Bukkit.isOwnedByCurrentRegion(player))
             return CompletableFuture.completedFuture(player.getLocation());
 
@@ -34,5 +31,4 @@ public final class RegionizedPlatform implements Platform {
             future.complete(null);
         return future;
     }
-
 }

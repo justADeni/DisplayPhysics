@@ -4,22 +4,10 @@ import org.joml.Vector3f;
 
 import java.util.Arrays;
 
-/**
- * Resolves contacts between one {@link Body} and the static terrain.
- *
- * <p>Sequential impulses with accumulated clamping: a non-penetration impulse
- * along the contact normal, two Coulomb friction impulses along the tangents,
- * then a split-impulse pass that removes penetration without adding energy.
- * One instance is reused across steps; call {@link #begin()}, add probes, then
- * {@link #solve}.
- */
 final class ContactSolver {
-
     private static final float SLOP = 0.01f;
     private static final float BAUMGARTE = 0.4f;
-    /** Most penetration (blocks) a single contact may correct per step. */
     private static final float MAX_CORRECTION = 0.3f;
-    /** Below this approach speed contacts don't bounce, so resting bodies settle. */
     private static final float BOUNCE_THRESHOLD = 1.0f;
 
     private int n;
@@ -35,7 +23,6 @@ final class ContactSolver {
     private float[] bounce = new float[capacity];
     private float[] accN = new float[capacity], acc1 = new float[capacity], acc2 = new float[capacity], accP = new float[capacity];
 
-    /** Fastest approach speed of any probe this step, and where it happened (relative coords). */
     float maxImpact;
     final Vector3f impactPoint = new Vector3f();
 
@@ -53,10 +40,6 @@ final class ContactSolver {
         return n;
     }
 
-    /**
-     * Tests the point at offset {@code (ox, oy, oz)} (world-space, from the centre of mass)
-     * and records a contact if it is inside solid terrain.
-     */
     void probe(Body body, Voxels terrain, float ox, float oy, float oz, boolean isHard) {
         float px = body.x.x + ox, py = body.x.y + oy, pz = body.x.z + oz;
         r.set(ox, oy, oz);
@@ -75,10 +58,6 @@ final class ContactSolver {
         n++;
     }
 
-    /**
-     * @param restitution     bounciness of hard contacts
-     * @param softRestitution bounciness of soft contacts (0 = soft pieces cushion)
-     */
     void solve(Body body, float dt, int iterations, float friction, float restitution, float softRestitution) {
         if (n == 0)
             return;
@@ -89,7 +68,6 @@ final class ContactSolver {
             r.set(rx[i], ry[i], rz[i]);
             nrm.set(nx[i], ny[i], nz[i]);
 
-            // Tangent basis
             if (Math.abs(nrm.x) < 0.9f) nrm.cross(1, 0, 0, dir); else nrm.cross(0, 1, 0, dir);
             dir.normalize();
             t1x[i] = dir.x; t1y[i] = dir.y; t1z[i] = dir.z;
@@ -142,7 +120,6 @@ final class ContactSolver {
 
         for (int it = 0; it < iterations; it++) {
             for (int i = 0; i < n; i++) {
-                // Capped so one deep overlap can only ever nudge the body, never fling it
                 float target = BAUMGARTE * Math.clamp(depth[i] - SLOP, 0f, MAX_CORRECTION) / dt;
                 if (target <= 0f && accP[i] == 0f)
                     continue;
@@ -176,5 +153,4 @@ final class ContactSolver {
     private static float clamp(float v, float min, float max) {
         return v < min ? min : (Math.min(v, max));
     }
-
 }

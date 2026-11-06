@@ -22,7 +22,6 @@ import java.util.Objects;
  * @param remainder what happens to the pieces the blast did not reach
  */
 public record Blast(Epicenter epicenter, float radius, Aim aim, float force, float lift, Remainder remainder) {
-
     public Blast {
         Objects.requireNonNull(epicenter);
         Objects.requireNonNull(aim);
@@ -33,7 +32,6 @@ public record Blast(Epicenter epicenter, float radius, Aim aim, float force, flo
 
     /** Where the blast is centred. */
     public sealed interface Epicenter {
-
         /** The centre of mass of the whole assembly. */
         Centre CENTRE = new Centre();
 
@@ -44,7 +42,6 @@ public record Blast(Epicenter epicenter, float radius, Aim aim, float force, flo
 
     /** The direction pieces are thrown in. */
     public sealed interface Aim {
-
         /** Straight away from the epicenter. */
         Outward OUTWARD = new Outward();
 
@@ -114,5 +111,4 @@ public record Blast(Epicenter epicenter, float radius, Aim aim, float force, flo
     public Blast remainder(Remainder remainder) {
         return new Blast(epicenter, radius, aim, force, lift, remainder);
     }
-
 }

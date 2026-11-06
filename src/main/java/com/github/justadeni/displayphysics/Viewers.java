@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
  */
 @FunctionalInterface
 public interface Viewers {
-
     /**
      * Whether this player (of the assembly's world) should see it.
      *
@@ -37,5 +36,4 @@ public interface Viewers {
     static Viewers nearby() {
         return within(Math.max(64, Bukkit.getViewDistance() * 16));
     }
-
 }

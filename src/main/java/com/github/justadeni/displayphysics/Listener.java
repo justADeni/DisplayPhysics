@@ -6,7 +6,6 @@ package com.github.justadeni.displayphysics;
  * the call.
  */
 public interface Listener {
-
     /** Called after every simulated tick. */
     default void onTick(Tick tick) {}
 
@@ -18,7 +17,6 @@ public interface Listener {
 
     /** Per-piece view of the current tick. */
     interface Tick {
-
         /** Ticks simulated so far, starting at 1. */
         int number();
 
@@ -43,5 +41,4 @@ public interface Listener {
         /** Whether it has broken into individual pieces. */
         boolean broken();
     }
-
 }

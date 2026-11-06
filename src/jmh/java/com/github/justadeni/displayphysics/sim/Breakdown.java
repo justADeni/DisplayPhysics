@@ -3,7 +3,6 @@ import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 
 import java.util.SplittableRandom;
 
-/** Phase timing of the hybrid terrain kernel (plain main, run pinned). */
 public final class Breakdown {
     public static void main(String[] args) throws Exception {
         for (String a : args) {

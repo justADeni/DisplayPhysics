@@ -9,18 +9,7 @@ import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Counts the pose updates three viewers would be sent while a cube blows up beside a wall, under three culling
- * settings, all from one and the same simulation, frame for frame, so every number is directly comparable:
- * <ul>
- *   <li>a viewer in the open, looking at the blast,</li>
- *   <li>the same spot, looking the other way,</li>
- *   <li>a viewer on the far side of the wall, looking at it.</li>
- * </ul>
- */
 class OcclusionPacketCountTest {
-
-    /** Flat ground at y = 64 and a wall across x = 12: 8 blocks high, 51 wide. */
     private static final TerrainSource WALLED = new TerrainSource() {
         public byte classify(int x, int y, int z) {
             if (y < 64)
@@ -41,7 +30,6 @@ class OcclusionPacketCountTest {
             Occlusion.standard().withoutViewCone(),
             Occlusion.standard()};
 
-    /** Updates sent over the blast: {@code sent[setting][viewer]}, and what an unculled feed sends. */
     private record Counts(long[][] sent, long everyone, int pieces, int ticks, boolean flushedAtTheEnd) {}
 
     private static Counts run() {
@@ -93,7 +81,6 @@ class OcclusionPacketCountTest {
                 }
         }
 
-        // On the last frame everything is sent, so every viewer ends up with the true final poses
         boolean flushed = true;
         for (var row : feeds)
             for (var feed : row)
@@ -110,7 +97,7 @@ class OcclusionPacketCountTest {
     @Test
     void aWallAndTheViewConeCutWhatEachViewerIsSent() {
         for (int attempt = 0; attempt < 3; attempt++) {
-            var c = run(); // a different blast each time: the properties below hold for all of them
+            var c = run();
             var sent = c.sent();
 
             System.out.printf("%d pieces, %d ticks; pose updates sent over the whole blast (no culling: %d to each viewer):%n", c.pieces(), c.ticks(), c.everyone());
@@ -124,17 +111,12 @@ class OcclusionPacketCountTest {
                 for (long count : row)
                     assertTrue(count <= c.everyone(), "culling never sends more than everyone gets");
 
-            // The wall alone hides most of the blast from the viewer behind it
             assertTrue(sent[0][2] < 0.5 * c.everyone(), "behind the wall: " + share(sent[0][2], c.everyone()));
-            // Pieces hiding each other cuts what the viewer in the open is sent
             assertTrue(sent[1][0] < 0.95 * sent[0][0], "pieces occluding: " + share(sent[1][0], c.everyone()) + " vs " + share(sent[0][0], c.everyone()));
-            // Looking away: the cone leaves almost nothing, where without it the blast behind them is still sent
             assertTrue(sent[2][1] < 0.5 * sent[1][1], "the cone cuts what a viewer looking away is sent");
             assertTrue(sent[2][1] < 0.35 * c.everyone(), "looking away: " + share(sent[2][1], c.everyone()));
-            // The cone can only remove updates, and the viewer who looks at the blast keeps most of them
             assertTrue(sent[2][0] <= sent[1][0] && sent[2][2] <= sent[1][2]);
             assertTrue(sent[2][0] > 0.4 * sent[1][0], "watching with the cone: " + share(sent[2][0], c.everyone()));
         }
     }
-
 }

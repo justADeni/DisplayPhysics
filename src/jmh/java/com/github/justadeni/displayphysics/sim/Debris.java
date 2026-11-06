@@ -8,22 +8,11 @@ import java.util.Arrays;
 
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
 
-/**
- * The pieces of an assembly that fell apart: one small rigid body per block, colliding
- * with the terrain (8 cube corners each) and with each other.
- *
- * <p>Block-to-block contacts treat each block as a sphere of radius 0.5, so blocks
- * that start side by side are exactly touching, not overlapping. Pieces that stay
- * calm while touching something fall asleep: they stop simulating and act as solid
- * ground for the others until something hits them hard enough to wake them.
- */
 final class Debris {
-
     private static final int SUBSTEPS = 4;
     private static final int ITERATIONS = 4;
     private static final float RESTITUTION = 0.1f;
 
-    /** Half-size of a cube for terrain probes, pulled in a hair so neighbours never start overlapping. */
     private static final float C = 0.49f;
 
     final Body[] pieces;
@@ -38,13 +27,9 @@ final class Debris {
 
     private final ContactSolver solver = new ContactSolver();
 
-    // Neighbour list: pairs close enough to touch soon, built once per tick and reused
-    // for every substep and both pair passes. Rebuilt early if anything moves more than
-    // half the margin, so no contact can be missed.
     private static final float MARGIN = 0.5f;
     private static final float PAIR_RANGE_SQ = (1f + MARGIN) * (1f + MARGIN);
     private static final float REBUILD_MOVE_SQ = (MARGIN / 2f) * (MARGIN / 2f);
-    /** Grid cell size; must cover the pair range so the 27 neighbouring cells hold every candidate. */
     private static final float CELL = 2f;
     private final Long2IntOpenHashMap grid = new Long2IntOpenHashMap();
     private final int[] gridNext;
@@ -72,15 +57,12 @@ final class Debris {
         grid.defaultReturnValue(-1);
     }
 
-    /** Turns {@code piece} into a unit cube of the given mass. */
     static void makeCube(Body piece, float mass) {
         piece.invMass = 1f / mass;
-        // Solid unit cube: I = m/6 on every axis, so world and body inertia match.
         piece.invInertiaBody.identity().scale(6f / mass);
         piece.invInertia.set(piece.invInertiaBody);
     }
 
-    /** Advances one tick; returns whether every piece has come to rest. */
     boolean step() {
         float dt = TICK / SUBSTEPS;
         Arrays.fill(touching, false);
@@ -98,14 +80,11 @@ final class Debris {
                     p.w.mul(1f - LIQUID_DRAG * dt);
                     touching[i] = true;
                 }
-                // Soft pieces catch the air
                 float drag = hard[i] ? 0.05f : 1.0f;
                 p.v.mul(1f - drag * dt);
                 p.w.mul(1f - (touching[i] ? ROLLING_RESISTANCE : 0.2f) * dt);
             }
 
-            // Blocks push each other apart first, so the terrain pass gets the last
-            // word and nothing is left shoved into the ground.
             if (s > 0 && movedTooFar())
                 buildPairs();
             solvePairs(true);
@@ -116,7 +95,6 @@ final class Debris {
                     continue;
                 Body p = pieces[i];
                 solver.begin();
-                // The 8 corners are every +/- combination of the cube's three rotated half-axes
                 p.q.get(rot);
                 float ax = rot.m00 * C, ay = rot.m01 * C, az = rot.m02 * C;
                 float bx = rot.m10 * C, by = rot.m11 * C, bz = rot.m12 * C;
@@ -157,10 +135,6 @@ final class Debris {
         return allAsleep;
     }
 
-    /**
-     * Collects every pair of pieces within reach of touching. Only awake pieces search;
-     * sleeping ones are found as their neighbours (they still block, but cost nothing).
-     */
     private void buildPairs() {
         grid.clear();
         for (int i = 0; i < count; i++) {
@@ -184,7 +158,6 @@ final class Debris {
                     for (int dz = -1; dz <= 1; dz++) {
                         int j = grid.get(key(cx + dx, cy + dy, cz + dz));
                         for (; j != -1; j = gridNext[j]) {
-                            // Each awake-awake pair once; awake-asleep pairs from the awake side
                             if (j == i || (!asleep[j] && j < i))
                                 continue;
                             Vector3f xj = pieces[j].x;
@@ -203,7 +176,6 @@ final class Debris {
         }
     }
 
-    /** Whether any awake piece has moved far enough that the neighbour list may miss a contact. */
     private boolean movedTooFar() {
         for (int i = 0; i < count; i++) {
             if (asleep[i])
@@ -220,7 +192,6 @@ final class Debris {
         return Voxels.floor(v / CELL);
     }
 
-    /** @param positional false: velocity impulses with friction; true: push overlapping pairs apart */
     private void solvePairs(boolean positional) {
         for (int p = 0; p < pairCount; p++)
             resolvePair(pairA[p], pairB[p], positional);
@@ -241,7 +212,6 @@ final class Debris {
         touching[i] = true;
         touching[j] = true;
 
-        // A sleeping piece acts as immovable ground
         float wa = asleep[i] ? 0f : a.invMass;
         float wb = asleep[j] ? 0f : b.invMass;
 
@@ -255,7 +225,6 @@ final class Debris {
             return;
         }
 
-        // Contact offsets: half a block towards each other (r_b = -r_a)
         float rax = nx * 0.5f, ray = ny * 0.5f, raz = nz * 0.5f;
         float vax = a.v.x + (a.w.y * raz - a.w.z * ray), vay = a.v.y + (a.w.z * rax - a.w.x * raz), vaz = a.v.z + (a.w.x * ray - a.w.y * rax);
         float vbx = b.v.x - (b.w.y * raz - b.w.z * ray), vby = b.v.y - (b.w.z * rax - b.w.x * raz), vbz = b.v.z - (b.w.x * ray - b.w.y * rax);
@@ -264,7 +233,6 @@ final class Debris {
         if (vn >= 0f)
             return;
 
-        // A fast hit wakes a sleeping piece
         if (-vn > 1f) {
             if (asleep[i]) { asleep[i] = false; calm[i] = 0; wa = a.invMass; }
             if (asleep[j]) { asleep[j] = false; calm[j] = 0; wb = b.invMass; }
@@ -272,13 +240,11 @@ final class Debris {
         if (wa + wb == 0f)
             return;
 
-        // Bouncy soft pieces spring off whatever they hit; otherwise blocks barely rebound off each other
         float restitution = (!hard[i] || !hard[j]) ? Math.max(RESTITUTION, softBounciness) : RESTITUTION;
         float jn = -(1f + restitution) * vn / (wa + wb);
         a.v.sub(nx * jn * wa, ny * jn * wa, nz * jn * wa);
         b.v.add(nx * jn * wb, ny * jn * wb, nz * jn * wb);
 
-        // Friction: touching blocks drag and spin each other
         float tx = rvx - vn * nx, ty = rvy - vn * ny, tz = rvz - vn * nz;
         float vt = (float) Math.sqrt(tx * tx + ty * ty + tz * tz);
         if (vt < 1e-5f)
@@ -288,7 +254,6 @@ final class Debris {
         float kt = wa + wb + (ia + ib) * 0.25f;
         float jt = Math.min(vt / kt, friction * jn);
 
-        // Impulse +P on a at r_a, -P on b at r_b: both give (n/2) x P
         float px = tx * jt, py = ty * jt, pz = tz * jt;
         a.v.add(px * wa, py * wa, pz * wa);
         b.v.sub(px * wb, py * wb, pz * wb);
@@ -296,5 +261,4 @@ final class Debris {
         a.w.add(cxp * ia, cyp * ia, czp * ia);
         b.w.add(cxp * ib, cyp * ib, czp * ib);
     }
-
 }

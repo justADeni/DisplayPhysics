@@ -1,6 +1,5 @@
 package com.github.justadeni.displayphysics.sim;
 
-/** Reaches the vector kernels' debug counters by reflection (they live in another source set). */
 final class Hook {
     static long[] times() {
         try {

@@ -16,7 +16,6 @@ import org.bukkit.block.data.BlockData;
  * @param glowRgb glow colour as {@code 0xRRGGBB}, or {@code -1} for no glow
  */
 public record Piece(int x, int y, int z, BlockData data, boolean hard, float mass, int glowRgb) {
-
     public Piece(int x, int y, int z, BlockData data, boolean hard, float mass) {
         this(x, y, z, data, hard, mass, -1);
     }
@@ -24,5 +23,4 @@ public record Piece(int x, int y, int z, BlockData data, boolean hard, float mas
     public static Piece at(Location location, BlockData data, boolean hard, float mass, int glowRgb) {
         return new Piece(location.getBlockX(), location.getBlockY(), location.getBlockZ(), data, hard, mass, glowRgb);
     }
-
 }

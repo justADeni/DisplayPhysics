@@ -5,24 +5,13 @@ import com.github.justadeni.displayphysics.sim.Grid;
 
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
 
-/**
- * The reference kernels, plain loops over the {@link Bodies} arrays. They define what the SIMD kernels
- * must compute, and run wherever the Vector API is missing or the batch is too small to pay for it.
- *
- * <p>Terrain normals always run along an axis and cubes are isotropic, which removes almost all the general
- * machinery of a contact solver: a contact is an axis (one-hot), a sign and a depth; the two friction
- * directions are the other two axes; and the effective mass along an axis {@code d} is
- * {@code invMass + invInertia * (3C^2 - (r.d)^2)}, because every corner is {@code sqrt(3) C} from the centre.
- */
 public final class ScalarKernels implements Kernels {
-
     static final ScalarKernels INSTANCE = new ScalarKernels();
 
     static int nearScan(float[] xs, float[] ys, float[] zs, int from, int to, float ax, float ay, float az, float rangeSq, int[] out) {
         int count = 0;
         for (int o = from; o < to; o++) {
             float dx = xs[o] - ax, dy = ys[o] - ay, dz = zs[o] - az;
-            // Written either way, kept only if close: no unpredictable branch
             out[count] = o;
             count += dx * dx + dy * dy + dz * dz < rangeSq ? 1 : 0;
         }
@@ -36,12 +25,6 @@ public final class ScalarKernels implements Kernels {
         return "scalar";
     }
 
-    // ── Shared approximations ────────────────────────────────────────────────
-
-    /**
-     * {@code 1/sqrt(x)} to about 5e-6, from an integer-bit guess and two Newton steps: a handful of
-     * multiply-adds instead of a square root and a division.
-     */
     static float inverseSquareRoot(float x) {
         float half = 0.5f * x;
         float y = Float.intBitsToFloat(0x5f3759df - (Float.floatToRawIntBits(x) >> 1));
@@ -49,8 +32,6 @@ public final class ScalarKernels implements Kernels {
         y *= Math.fma(-half * y, y, 1.5f);
         return y;
     }
-
-    // ── Forces ───────────────────────────────────────────────────────────────
 
     @Override
     public void forces(Bodies b, int from, int to, Grid grid, float dt, float gravity) {
@@ -68,7 +49,6 @@ public final class ScalarKernels implements Kernels {
             }
 
             float linear = 1f - b.drag[i] * dt;
-            // Rough contact digs in, so a piece touching something resists rolling
             float angular = 1f - (touch > 0f ? ROLLING_RESISTANCE : 0.2f) * dt;
             b.vx[i] = vx * linear; b.vy[i] = vy * linear; b.vz[i] = vz * linear;
             b.wx[i] = wx * angular; b.wy[i] = wy * angular; b.wz[i] = wz * angular;
@@ -76,9 +56,6 @@ public final class ScalarKernels implements Kernels {
         }
     }
 
-    // ── Terrain contacts ─────────────────────────────────────────────────────
-
-    // Per contact: offset from the centre, one-hot normal axis and its sign, depth, effective masses, bounce target and accumulated impulses
     private static final int RX = 0, RY = 1, RZ = 2, AX = 3, AY = 4, AZ = 5, SIGN = 6, DEPTH = 7, KN = 8, K1 = 9, K2 = 10,
             BOUNCE = 11, ACC_N = 12, ACC_1 = 13, ACC_2 = 14, ACC_P = 15, STRIDE = 16;
 
@@ -89,7 +66,6 @@ public final class ScalarKernels implements Kernels {
         for (int i = from; i < to; i++) {
             float qx = b.qx[i], qy = b.qy[i], qz = b.qz[i], qw = b.qw[i];
             float xx = qx * qx, yy = qy * qy, zz = qz * qz, xy = qx * qy, xz = qx * qz, yz = qy * qz, wxq = qw * qx, wyq = qw * qy, wzq = qw * qz;
-            // Columns of the rotation matrix, already scaled to the corner reach
             float c0x = CORNER * (1f - 2f * (yy + zz)), c0y = CORNER * 2f * (xy + wzq), c0z = CORNER * 2f * (xz - wyq);
             float c1x = CORNER * 2f * (xy - wzq), c1y = CORNER * (1f - 2f * (xx + zz)), c1z = CORNER * 2f * (yz + wxq);
             float c2x = CORNER * 2f * (xz + wyq), c2y = CORNER * 2f * (yz - wxq), c2z = CORNER * (1f - 2f * (xx + yy));
@@ -108,14 +84,11 @@ public final class ScalarKernels implements Kernels {
                 if ((cell & Grid.TYPE_MASK) != Grid.SOLID)
                     continue;
 
-                // The way out: the nearest open face the point could have come in through (it isn't already leaving
-                // through it), so a protrusion sinking into a slab is never pushed up through it block after block
                 float velX = vx + (wy * rz - wz * ry), velY = vy + (wz * rx - wx * rz), velZ = vz + (wx * ry - wy * rx);
                 float fx = cpx - ix, fy = cpy - iy, fz = cpz - iz;
                 float best = Float.MAX_VALUE;
                 float ax = 0, ay = 0, az = 0, sign = 1;
 
-                // A slight preference for pushing up, so things resting on flat ground are never shoved off a block edge
                 if ((cell & Grid.OPEN_PY) != 0 && velY < MAX_EXIT_SPEED && (1f - fy) - 0.05f < best) { best = (1f - fy) - 0.05f; ax = 0; ay = 1; az = 0; sign = 1; }
                 if ((cell & Grid.OPEN_PX) != 0 && velX < MAX_EXIT_SPEED && 1f - fx < best) { best = 1f - fx; ax = 1; ay = 0; az = 0; sign = 1; }
                 if ((cell & Grid.OPEN_NX) != 0 && -velX < MAX_EXIT_SPEED && fx < best) { best = fx; ax = 1; ay = 0; az = 0; sign = -1; }
@@ -123,7 +96,7 @@ public final class ScalarKernels implements Kernels {
                 if ((cell & Grid.OPEN_NZ) != 0 && -velZ < MAX_EXIT_SPEED && fz < best) { best = fz; ax = 0; ay = 0; az = 1; sign = -1; }
                 if ((cell & Grid.OPEN_NY) != 0 && -velY < MAX_EXIT_SPEED && fy < best) { best = fy; ax = 0; ay = 1; az = 0; sign = -1; }
                 if (best == Float.MAX_VALUE)
-                    continue; // buried, or only exits it is already heading through
+                    continue;
 
                 int o = n++ * STRIDE;
                 c[o + RX] = rx; c[o + RY] = ry; c[o + RZ] = rz;
@@ -139,7 +112,6 @@ public final class ScalarKernels implements Kernels {
             for (int k = 0; k < n; k++) {
                 int o = k * STRIDE;
                 float rx = c[o + RX], ry = c[o + RY], rz = c[o + RZ], ax = c[o + AX], ay = c[o + AY], az = c[o + AZ];
-                // The friction directions are the other two axes: (az, ax, ay) and (ay, az, ax) when the normal is (ax, ay, az)
                 float ra = rx * ax + ry * ay + rz * az;
                 float r1 = rx * az + ry * ax + rz * ay;
                 float r2 = rx * ay + ry * az + rz * ax;
@@ -157,7 +129,6 @@ public final class ScalarKernels implements Kernels {
                     int o = k * STRIDE;
                     float rx = c[o + RX], ry = c[o + RY], rz = c[o + RZ], ax = c[o + AX], ay = c[o + AY], az = c[o + AZ], sign = c[o + SIGN];
 
-                    // Normal impulse first, so friction has something to be a fraction of
                     float vd = sign * ((vx + (wy * rz - wz * ry)) * ax + (vy + (wz * rx - wx * rz)) * ay + (vz + (wx * ry - wy * rx)) * az);
                     float accN = c[o + ACC_N];
                     float nextN = Math.max(Math.fma(c[o + BOUNCE] - vd, c[o + KN], accN), 0f);
@@ -182,7 +153,6 @@ public final class ScalarKernels implements Kernels {
                 }
             }
 
-            // Split impulse: push out of the terrain with pseudo velocities, which add no energy
             for (int it = 0; it < ITERATIONS; it++) {
                 for (int k = 0; k < n; k++) {
                     int o = k * STRIDE;
@@ -209,8 +179,6 @@ public final class ScalarKernels implements Kernels {
         }
     }
 
-    // ── Integration ──────────────────────────────────────────────────────────
-
     @Override
     public void integrate(Bodies b, int from, int to, float dt) {
         float h = 0.5f * dt;
@@ -232,14 +200,12 @@ public final class ScalarKernels implements Kernels {
             b.py[i] = Math.fma(vy + b.vpy[i], dt, b.py[i]);
             b.pz[i] = Math.fma(vz + b.vpz[i], dt, b.pz[i]);
 
-            // q += dt/2 * (w, 0) * q, renormalised
             float ax = wx + b.wpx[i], ay = wy + b.wpy[i], az = wz + b.wpz[i];
             float qx = b.qx[i], qy = b.qy[i], qz = b.qz[i], qw = b.qw[i];
             float nqx = Math.fma(Math.fma(ax, qw, Math.fma(ay, qz, -az * qy)), h, qx);
             float nqy = Math.fma(Math.fma(-ax, qz, Math.fma(ay, qw, az * qx)), h, qy);
             float nqz = Math.fma(Math.fma(ax, qy, Math.fma(-ay, qx, az * qw)), h, qz);
             float nqw = Math.fma(Math.fma(-ax, qx, Math.fma(-ay, qy, -az * qz)), h, qw);
-            // The quaternion is within a few percent of unit length, where 1/sqrt(n) is 1.5 - n/2 to better than 1e-3
             float inv = Math.fma(-0.5f, Math.fma(nqx, nqx, Math.fma(nqy, nqy, Math.fma(nqz, nqz, nqw * nqw))), 1.5f);
             b.qx[i] = nqx * inv; b.qy[i] = nqy * inv; b.qz[i] = nqz * inv; b.qw[i] = nqw * inv;
 
@@ -248,12 +214,8 @@ public final class ScalarKernels implements Kernels {
         }
     }
 
-    // ── Visibility ───────────────────────────────────────────────────────────
-
-    /** Where on a piece the lines of sight end: its centre and four corners spread around it. */
     static final float[] SIGHT_POINTS = {0f, 0f, 0f, .4f, .4f, .4f, -.4f, .4f, -.4f, .4f, -.4f, -.4f, -.4f, -.4f, .4f};
 
-    /** A piece never hides itself or its immediate neighbours: samples this close to the line's end ignore the pieces. */
     static final float SELF_CLEARANCE = 0.8f;
 
     static void lineOfSight(Bodies b, int from, int to, Grid grid, byte[] occupancy, Sight sight, boolean[] out) {
@@ -273,7 +235,6 @@ public final class ScalarKernels implements Kernels {
                 out[i] = true;
                 continue;
             }
-            // Outside the cone the player could be looking through: not worth a single line
             if (sight.cone() && !sight.inCone(dx, dy, dz, (float) Math.sqrt(distanceSquared))) {
                 out[i] = false;
                 continue;
@@ -290,7 +251,6 @@ public final class ScalarKernels implements Kernels {
                 for (int s = 0; s < steps && !blocked; s++) {
                     float f = (s + 0.5f) * inverse;
                     int x = Grid.floor(ex + rx * f), y = Grid.floor(ey + ry * f), z = Grid.floor(ez + rz * f);
-                    // Outside the tracked area nothing is known, so nothing blocks
                     if (x >= grid.x0 && x < grid.x0 + grid.sx && y >= grid.y0 && y < grid.y0 + grid.sy && z >= grid.z0 && z < grid.z0 + grid.sz) {
                         int index = grid.index(x, y, z);
                         blocked = (cells[index] & Grid.TYPE_MASK) == Grid.SOLID
@@ -303,8 +263,6 @@ public final class ScalarKernels implements Kernels {
         }
     }
 
-    // ── Calm ─────────────────────────────────────────────────────────────────
-
     @Override
     public void calm(Bodies b, int from, int to) {
         for (int i = from; i < to; i++) {
@@ -314,5 +272,4 @@ public final class ScalarKernels implements Kernels {
             b.calm[i] = calm ? b.calm[i] + 1 : 0;
         }
     }
-
 }

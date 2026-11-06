@@ -9,54 +9,33 @@ import java.util.Arrays;
 
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
 
-/**
- * The pieces of an assembly that came apart: one small rigid cube per block, colliding with the terrain
- * (eight corners each) and with each other.
- *
- * <p>State lives in flat arrays ({@link Bodies}) and the heavy per-piece passes are {@link Kernels}, which
- * run as SIMD where the JVM allows. Pairs of pieces touching each other are found with a spatial hash and
- * solved here, scalar: that work is irregular, data dependent and a small share of the tick.
- *
- * <p>A piece that stays calm while touching something falls asleep: it leaves the active range and is
- * written into the terrain grid as a solid voxel, so it keeps stopping what lands on it for free.
- */
 public final class FlatDebris {
-
     private static final float RESTITUTION = 0.1f;
 
-    /** Pairs closer than this to touching are listed; the list is rebuilt early if anything moves more than half of it. */
     private static final float MARGIN = 0.5f;
     private static final float PAIR_RANGE_SQ = (1f + MARGIN) * (1f + MARGIN);
     private static final float REBUILD_MOVE_SQ = (MARGIN / 2f) * (MARGIN / 2f);
-    /** Hash cell size; it must cover the pair range so the neighbouring cells hold every candidate. */
     private static final float CELL = 1f + MARGIN;
-    /** Every this many ticks, with at least this many pieces awake, the pieces are re-sorted into spatial order in memory. */
     private static final int REORDER_TICKS = 16, REORDER_MIN_PIECES = 2048;
     private int ticks;
 
-    /** How far outside the pieces the terrain grid must reach: a tick's travel, the corners, and the neighbour voxels. */
     private static final int GRID_MARGIN = 4;
 
     private final Bodies b;
     private final Grid grid;
-    /** Below this many awake pieces the scalar terrain kernel is faster than the SIMD one (measured around 100). */
     private static final int SIMD_TERRAIN_MIN = 100;
 
     private final Kernels kernels;
     private final float gravity, friction, softBounciness;
 
-    /** Above this many pair-search cells the pieces are too spread out for a dense grid and a hash map is used. */
     private static final int MAX_DENSE_CELLS = 1 << 22;
-    /** The limit in use; lowered by tests and benchmarks to compare the two pair searches. */
     public static int denseCellLimit = MAX_DENSE_CELLS;
 
     private final Long2IntOpenHashMap cells = new Long2IntOpenHashMap();
-    // Dense pair search: pieces counting-sorted by cell, so each cell's pieces are one contiguous run
     private int[] cellStart = new int[0];
     private int[] cellCursor = new int[0];
     private final int[] inCell;
     private final int[] sortedByCell;
-    /** The positions of the pieces in cell order, so testing a run of candidates streams contiguous memory. */
     private final float[] sortedX, sortedY, sortedZ;
     private int[] occupied = new int[256];
     private final int[] cellNext;
@@ -83,13 +62,11 @@ public final class FlatDebris {
         cells.defaultReturnValue(-1);
     }
 
-    /** Fills in everything about piece {@code i} that follows from it being a cube of this mass and kind. */
     public static void initCube(Bodies b, int i, float mass, boolean hard, float friction, float bounciness, float softBounciness) {
         b.invMass[i] = 1f / mass;
-        // A solid unit cube has inertia m/6 about any axis
         b.invInertia[i] = 6f / mass;
         b.hard[i] = hard;
-        b.drag[i] = hard ? 0.05f : 1.0f; // soft pieces catch the air
+        b.drag[i] = hard ? 0.05f : 1.0f;
         b.mu[i] = hard ? friction : friction * 1.5f;
         b.restitution[i] = hard ? bounciness : softBounciness;
         b.qw[i] = 1f;
@@ -103,12 +80,10 @@ public final class FlatDebris {
         return kernels;
     }
 
-    /** The host's copy of the world changed. */
     public void invalidate() {
         grid.invalidate();
     }
 
-    /** Puts a piece to sleep right away (before the first {@link #step}): it becomes solid ground. */
     public void sleep(int piece) {
         int s = b.slot[piece];
         if (s >= b.awake)
@@ -121,8 +96,6 @@ public final class FlatDebris {
         b.vx[s] = b.vy[s] = b.vz[s] = b.wx[s] = b.wy[s] = b.wz[s] = 0f;
         b.swap(s, --b.awake);
     }
-
-    // ── Reading the state, by piece ──────────────────────────────────────────
 
     public int awakeCount() { return b.awake; }
 
@@ -142,16 +115,9 @@ public final class FlatDebris {
         return (float) Math.sqrt(b.speedSquared(b.slot[piece]));
     }
 
-    // ── Visibility ───────────────────────────────────────────────────────────
-
     private boolean[] visibleBySlot = new boolean[0];
     private byte[] occupancy = new byte[0];
 
-    /**
-     * Which pieces can be seen from an eye (relative to the simulation's origin). The result is by piece.
-     * Pieces that came to rest are reported visible: they no longer change, and a viewer that has not seen
-     * their last move needs it.
-     */
     public void visibility(Sight sight, boolean piecesOcclude, boolean[] visibleByPiece) {
         int awake = b.awake;
         if (visibleBySlot.length < awake)
@@ -165,7 +131,6 @@ public final class FlatDebris {
             visibleByPiece[b.id[s]] = true;
     }
 
-    /** Counts, per terrain-grid voxel, the moving pieces whose centre is in it. */
     private byte[] occupancyOfMovingPieces(int awake) {
         if (occupancy.length != grid.cells.length)
             occupancy = new byte[grid.cells.length];
@@ -182,15 +147,10 @@ public final class FlatDebris {
         return occupancy;
     }
 
-    // ── Stepping ─────────────────────────────────────────────────────────────
-
-    /** Where the time of a tick goes, in nanoseconds summed over all ticks, by stage: see {@link #STAGES}. */
     public final long[] stageNanos = new long[12];
-    /** Pair-search statistics, summed over all ticks: list builds, candidate pairs tested, pairs kept. */
     public long builds, candidates, kept;
     public static final String[] STAGES = {"grid", "pair search", "forces", "pair solve", "terrain", "integrate", "calm + sleep", "total"};
 
-    /** Advances one tick; returns whether every piece has come to rest. */
     public boolean step() {
         int awake = b.awake;
         if (awake == 0)
@@ -210,7 +170,6 @@ public final class FlatDebris {
         for (int s = 0; s < SUBSTEPS; s++) {
             kernels.forces(b, 0, awake, grid, dt, gravity);
             t = lap(2, t);
-            // Pieces push each other apart first, so the terrain pass gets the last word and nothing is left shoved into the ground
             if (s > 0 && movedTooFar(awake))
                 buildPairs(awake);
             t = lap(1, t);
@@ -236,7 +195,6 @@ public final class FlatDebris {
         return now;
     }
 
-    /** Makes the terrain grid cover wherever the awake pieces can reach this tick. */
     private void prepareGrid(int awake) {
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
         float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
@@ -249,10 +207,6 @@ public final class FlatDebris {
                 Grid.floor(maxX) + GRID_MARGIN, Grid.floor(maxY) + GRID_MARGIN, Grid.floor(maxZ) + GRID_MARGIN);
     }
 
-    /**
-     * A piece shoved deep into the terrain has no open face to be pushed out of, so the contacts ignore it and it
-     * would fall through the ground for ever. Such a piece is lifted to the first open voxel above it.
-     */
     private void rescueBuried(int awake) {
         int top = grid.y0 + grid.sy;
         for (int i = 0; i < awake; i++) {
@@ -261,7 +215,7 @@ public final class FlatDebris {
                 continue;
             int cell = grid.cell(x, y, z);
             if ((cell & Grid.TYPE_MASK) != Grid.SOLID || (cell & ~Grid.TYPE_MASK) != 0)
-                continue; // in the open, or in a solid voxel it can still be pushed out of
+                continue;
             int free = y;
             while (free < top && (grid.cell(x, free, z) & Grid.TYPE_MASK) == Grid.SOLID)
                 free++;
@@ -273,39 +227,24 @@ public final class FlatDebris {
         }
     }
 
-    /** Moves pieces that stayed calm long enough out of the active range, as solid ground. */
     private void sweepSleepers() {
         int s = 0;
         while (s < b.awake) {
             if (b.calm[s] >= CALM_TICKS_TO_SLEEP)
-                sleepSlot(s); // the last awake piece took this slot: look at it next
+                sleepSlot(s);
             else
                 s++;
         }
     }
 
-    // ── Pieces against each other ────────────────────────────────────────────
-
     private static int cell(float v) {
         return Grid.floor(v / CELL);
     }
 
-    /**
-     * Lists every pair of awake pieces close enough to touch soon. The pieces are counting-sorted into a dense
-     * grid of cells (no hashing, one contiguous run of pieces per cell); only half of the neighbouring cells are
-     * searched (the others find the pair from the other side), so each pair is found once.
-     */
-    // The dense grid's shape, set by sortIntoCells
     private final int[] runStart = new int[5], runEnd = new int[5];
     private int[] hits = new int[64];
     private int cellsX, cellsY, cellsZ, occupiedCount;
 
-    /**
-     * Counting-sorts the awake pieces into cells: afterwards {@code sortedByCell} lists the slots cell by cell,
-     * {@code cellStart} says where each cell's run begins and {@code occupied} lists the non-empty cells.
-     *
-     * @return false if the pieces are spread over too many cells for a dense grid
-     */
     private boolean sortIntoCells(int awake) {
         long t0 = System.nanoTime();
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
@@ -315,7 +254,6 @@ public final class FlatDebris {
             minY = Math.min(minY, b.py[i]); maxY = Math.max(maxY, b.py[i]);
             minZ = Math.min(minZ, b.pz[i]); maxZ = Math.max(maxZ, b.pz[i]);
         }
-        // One empty cell of margin on every side, so neighbour cells never fall off the grid
         int nx = (int) ((maxX - minX) / CELL) + 3, ny = (int) ((maxY - minY) / CELL) + 3, nz = (int) ((maxZ - minZ) / CELL) + 3;
         long total = (long) nx * ny * nz;
         if (total > denseCellLimit)
@@ -347,7 +285,6 @@ public final class FlatDebris {
         }
         stageNanos[9] += System.nanoTime() - t0;
         t0 = System.nanoTime();
-        // Prefix sums turn the counts into where each cell's run starts
         for (int c = 0; c < size; c++)
             cellStart[c + 1] += cellStart[c];
         System.arraycopy(cellStart, 0, cellCursor, 0, size);
@@ -357,11 +294,6 @@ public final class FlatDebris {
         return true;
     }
 
-    /**
-     * Lists every pair of awake pieces close enough to touch soon. The pieces are counting-sorted into a dense
-     * grid of cells (no hashing, one contiguous run of pieces per cell); only half of the neighbouring cells are
-     * searched (the others find the pair from the other side), so each pair is found once.
-     */
     private void buildPairs(int awake) {
         builds++;
         pairCount = 0;
@@ -389,7 +321,6 @@ public final class FlatDebris {
             int c = occupied[k];
             int from = cellStart[c], to = cellStart[c + 1];
 
-            // The cells of one row are contiguous in the sorted order, so each row's three cells form one run
             int[] rs = runStart, re = runEnd;
             rs[0] = from; re[0] = cellStart[c + 2];
             rs[1] = cellStart[c + nx - 1]; re[1] = cellStart[c + nx + 2];
@@ -427,7 +358,6 @@ public final class FlatDebris {
         stageNanos[11] += System.nanoTime() - t0;
     }
 
-    /** The pair search for pieces too spread out for a dense grid: a hash map from cell to the pieces in it. */
     private void buildPairsHashed(int awake) {
         cells.clear();
         for (int i = 0; i < awake; i++) {
@@ -438,7 +368,6 @@ public final class FlatDebris {
 
         for (int i = 0; i < awake; i++) {
             int cx = cell(b.px[i]), cy = cell(b.py[i]), cz = cell(b.pz[i]);
-            // Own cell: only the pieces after this one. Then the 13 neighbouring cells that come after it in x, y, z order.
             for (int j = cellNext[i]; j != -1; j = cellNext[j])
                 addPair(i, j);
             for (int dx = -1; dx <= 1; dx++)
@@ -476,7 +405,6 @@ public final class FlatDebris {
         return false;
     }
 
-    /** @param positional true: push overlapping pairs apart; false: velocity impulses with friction */
     private void solvePairs(boolean positional) {
         for (int p = 0; p < pairCount; p++)
             resolvePair(pairA[p], pairB[p], positional);
@@ -505,7 +433,6 @@ public final class FlatDebris {
             return;
         }
 
-        // Contact offsets: half a block towards each other (r_b = -r_a)
         float rax = nx * 0.5f, ray = ny * 0.5f, raz = nz * 0.5f;
         float vax = b.vx[i] + (b.wy[i] * raz - b.wz[i] * ray), vay = b.vy[i] + (b.wz[i] * rax - b.wx[i] * raz), vaz = b.vz[i] + (b.wx[i] * ray - b.wy[i] * rax);
         float vbx = b.vx[j] - (b.wy[j] * raz - b.wz[j] * ray), vby = b.vy[j] - (b.wz[j] * rax - b.wx[j] * raz), vbz = b.vz[j] - (b.wx[j] * ray - b.wy[j] * rax);
@@ -514,13 +441,11 @@ public final class FlatDebris {
         if (vn >= 0f)
             return;
 
-        // Soft pieces spring off whatever they hit if told to; otherwise pieces barely rebound off each other
         float restitution = (!b.hard[i] || !b.hard[j]) ? Math.max(RESTITUTION, softBounciness) : RESTITUTION;
         float jn = -(1f + restitution) * vn / (wa + wb);
         b.vx[i] -= nx * jn * wa; b.vy[i] -= ny * jn * wa; b.vz[i] -= nz * jn * wa;
         b.vx[j] += nx * jn * wb; b.vy[j] += ny * jn * wb; b.vz[j] += nz * jn * wb;
 
-        // Friction: touching pieces drag and spin each other
         float tx = rvx - vn * nx, ty = rvy - vn * ny, tz = rvz - vn * nz;
         float vt = (float) Math.sqrt(tx * tx + ty * ty + tz * tz);
         if (vt < 1e-5f)
@@ -530,7 +455,6 @@ public final class FlatDebris {
         float kt = wa + wb + (ia + ib) * 0.25f;
         float jt = Math.min(vt / kt, friction * jn);
 
-        // Impulse +P on a at r_a, -P on b at r_b: both give (n/2) x P
         float px = tx * jt, py = ty * jt, pz = tz * jt;
         b.vx[i] += px * wa; b.vy[i] += py * wa; b.vz[i] += pz * wa;
         b.vx[j] -= px * wb; b.vy[j] -= py * wb; b.vz[j] -= pz * wb;
@@ -538,5 +462,4 @@ public final class FlatDebris {
         b.wx[i] += cxp * ia; b.wy[i] += cyp * ia; b.wz[i] += czp * ia;
         b.wx[j] += cxp * ib; b.wy[j] += cyp * ib; b.wz[j] += czp * ib;
     }
-
 }

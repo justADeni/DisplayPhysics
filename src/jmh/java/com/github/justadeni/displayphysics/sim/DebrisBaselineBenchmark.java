@@ -2,13 +2,10 @@ package com.github.justadeni.displayphysics.sim;
 
 import org.openjdk.jmh.annotations.*;
 
-/** The original object-based debris engine (one {@code Body} per piece, hash-map terrain), as the baseline. */
 @State(Scope.Thread)
 @Warmup(iterations = 2)
 @Measurement(iterations = 3)
 public class DebrisBaselineBenchmark {
-
-    /** One second of simulation per operation. */
     private static final int TICKS = 20;
 
     @Param({"1000", "10000", "100000"})
@@ -28,5 +25,4 @@ public class DebrisBaselineBenchmark {
             asleep = debris.step();
         return asleep;
     }
-
 }

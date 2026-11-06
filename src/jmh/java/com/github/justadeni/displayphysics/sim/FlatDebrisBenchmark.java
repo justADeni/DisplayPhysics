@@ -3,13 +3,10 @@ import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 
 import org.openjdk.jmh.annotations.*;
 
-/** The flat-array debris engine, scalar and SIMD kernels, on the same workload as the baseline. */
 @State(Scope.Thread)
 @Warmup(iterations = 2)
 @Measurement(iterations = 3)
 public class FlatDebrisBenchmark {
-
-    /** One second of simulation per operation. */
     private static final int TICKS = 20;
 
     @Param({"1000", "10000", "100000"})
@@ -35,5 +32,4 @@ public class FlatDebrisBenchmark {
             asleep = debris.step();
         return asleep;
     }
-
 }

@@ -16,9 +16,7 @@ import org.joml.Vector3f;
  * @param releaseAngle tilt in radians at which it lets go and becomes a free body
  */
 public record Hinge(double pivotX, double pivotY, double pivotZ, Vector3f axis, float height, float initialAngle, float releaseAngle) {
-
     public static Hinge at(Location pivot, Vector3f axis, float height, float initialAngle, float releaseAngle) {
         return new Hinge(pivot.getX(), pivot.getY(), pivot.getZ(), axis, height, initialAngle, releaseAngle);
     }
-
 }

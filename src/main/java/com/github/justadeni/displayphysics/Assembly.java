@@ -36,13 +36,10 @@ import java.util.concurrent.locks.LockSupport;
  * including a Folia region thread.
  */
 public final class Assembly {
-
     private static final long TICK_NANOS = 50_000_000L;
     private static final int VIEWER_REFRESH_TICKS = 20;
-    /** Floats per pose, see {@link PoseFeed}. */
     private static final int POSE_STRIDE = PoseFeed.STRIDE;
     private static final float VIEW_RANGE = 3f;
-    /** Roughly where a standing player's eyes are above their feet. */
     private static final double EYE_HEIGHT = 1.62;
 
     private final Logger logger;
@@ -58,26 +55,20 @@ public final class Assembly {
     private final Object[][] spawnPlain, spawnGlow;
     private final boolean anyGlow;
 
-    /** A player the displays are shown to. */
     private static final class Watcher {
         volatile double eyeX, eyeY, eyeZ;
-        /** The unit vector they look along. */
         volatile float lookX, lookY = 0f, lookZ = 1f;
         volatile boolean located;
-        /** With occlusion on: what this player has been sent, and which pieces they can see. */
         PoseFeed feed;
     }
 
     private final Map<Player, Watcher> shown = new ConcurrentHashMap<>();
-    /** Set when a simulation starts with occlusion culling on. */
     private volatile Occlusion occlusion;
     private Object[] frameCache = new Object[0];
     private final AtomicBoolean released = new AtomicBoolean();
     private final double centerX, centerY, centerZ;
 
-    /** What everyone has been sent when nothing is culled; guarded by {@code this}. */
     private final PoseFeed shared;
-    /** The newest pose of every piece, when culling means there is no single "what everyone has". */
     private final float[] latest;
     private final int[] selection;
     private boolean anySent;
@@ -123,7 +114,6 @@ public final class Assembly {
         centerZ = sz / count;
 
         spawned = refreshViewers();
-        // Safety net: displays nobody ever released would stay on clients until they reload the chunk
         DisplayPhysics.later(this::release, 600_000L);
     }
 
@@ -154,7 +144,7 @@ public final class Assembly {
         Thread.ofVirtual().name("DisplayPhysics").start(() -> {
             try {
                 if (settings.removeBlocks) {
-                    spawned.join(); // the displays are up, so removing the blocks leaves no gap
+                    spawned.join();
                     removeBlocks();
                 }
                 future.complete(run(hinge, settings, terrain, listener));
@@ -165,7 +155,6 @@ public final class Assembly {
         return future;
     }
 
-    /** Sets the real blocks to air, one task per chunk on the thread that owns it. */
     private void removeBlocks() {
         Map<Long, List<Piece>> byChunk = new HashMap<>();
         for (Piece piece : pieces)
@@ -179,10 +168,6 @@ public final class Assembly {
         }
     }
 
-    /**
-     * Places each piece's block where it came to rest, one task per chunk on the thread that owns it, and releases
-     * the displays once every chunk is done. Only air and replaceable blocks are overwritten.
-     */
     private void placeBlocks(double[] positions) {
         Map<Long, List<Integer>> byChunk = new HashMap<>();
         int[] bx = new int[count], by = new int[count], bz = new int[count];
@@ -224,8 +209,6 @@ public final class Assembly {
         return released.get();
     }
 
-    // ── The simulation loop ──────────────────────────────────────────────────
-
     private Result run(Hinge hinge, Settings settings, TerrainSource terrain, Listener listener) {
         int[] x = new int[count], y = new int[count], z = new int[count];
         boolean[] hard = new boolean[count];
@@ -265,8 +248,6 @@ public final class Assembly {
                     pose[o] = q.x; pose[o + 1] = q.y; pose[o + 2] = q.z; pose[o + 3] = q.w;
                     pose[o + 4] = t.x; pose[o + 5] = t.y; pose[o + 6] = t.z;
                 }
-                // Only every updateInterval-th frame is sent, the client interpolating in between;
-                // the last pose is always sent.
                 unsent++;
                 if (unsent >= settings.updateInterval || done) {
                     publish(pose, unsent, done);
@@ -292,11 +273,10 @@ public final class Assembly {
                     if (wait > 0)
                         LockSupport.parkNanos(wait);
                     else if (wait < -5 * TICK_NANOS)
-                        next = System.nanoTime(); // far behind: skip ahead instead of rushing to catch up
+                        next = System.nanoTime();
                 }
             }
         } catch (Throwable e) {
-            // Never leave pieces hanging in the air: hand over whatever state was reached
             error = e;
             logger.log(Level.WARNING, "Simulation failed, using the state it reached", e);
         }
@@ -319,11 +299,6 @@ public final class Assembly {
         return new Result(positions, rotations, sim.broken(), sim.tick(), error);
     }
 
-    /**
-     * Sends the pieces that moved since the last frame, bundled. Without occlusion everyone gets the same
-     * bundle; with it each player gets only the pieces they can see (all of them on the last frame, so nothing
-     * is left where it was last seen).
-     */
     private synchronized void publish(float[] pose, int ticks, boolean last) {
         if (occlusion != null) {
             publishCulled(pose, ticks, last);
@@ -345,7 +320,7 @@ public final class Assembly {
     private void publishCulled(float[] pose, int ticks, boolean last) {
         if (frameCache.length < count)
             frameCache = new Object[count];
-        System.arraycopy(pose, 0, latest, 0, count * POSE_STRIDE); // for whoever arrives next
+        System.arraycopy(pose, 0, latest, 0, count * POSE_STRIDE);
         anySent = true;
         if (released.get())
             return;
@@ -360,7 +335,6 @@ public final class Assembly {
             List<Object> packets = new ArrayList<>(picked);
             for (int k = 0; k < picked; k++) {
                 int piece = selection[k];
-                // One packet per piece per frame, shared by everyone who gets it
                 packets.add(frameCache[piece] != null ? frameCache[piece] : (frameCache[piece] = posePacket(pose, piece, ticks)));
             }
             Packets.send(entry.getKey(), Packets.bundle(packets));
@@ -374,14 +348,10 @@ public final class Assembly {
                 new Quaternionf(source[o], source[o + 1], source[o + 2], source[o + 3]));
     }
 
-    /** The newest pose of every piece. */
     private float[] newest() {
         return occlusion != null ? latest : shared.sent();
     }
 
-    // ── Occlusion ────────────────────────────────────────────────────────────
-
-    /** Starts per-player bookkeeping for everyone already watching. */
     private synchronized void enableOcclusion(Occlusion occlusion) {
         this.occlusion = occlusion;
         if (occlusion != null) {
@@ -391,19 +361,12 @@ public final class Assembly {
         }
     }
 
-    /** Recomputes which pieces each player can see from where they stand. */
     private void updateVisibility(Simulator sim, Occlusion occlusion) {
         for (Watcher watcher : shown.values())
             if (watcher.located && watcher.feed != null)
                 sim.visibility(occlusion, watcher.eyeX, watcher.eyeY, watcher.eyeZ, watcher.lookX, watcher.lookY, watcher.lookZ, watcher.feed.visible());
     }
 
-    // ── Viewers ──────────────────────────────────────────────────────────────
-
-    /**
-     * Shows the displays to players who came into range and removes them from those who left.
-     * Each player is located on the thread that owns them; the shown set is updated once all answered.
-     */
     private CompletableFuture<Void> refreshViewers() {
         if (released.get() || !refreshing.compareAndSet(false, true))
             return CompletableFuture.completedFuture(null);
@@ -456,7 +419,6 @@ public final class Assembly {
             boolean arriving = watcher == null;
             if (arriving)
                 watcher = new Watcher();
-            // Where their eyes are, for occlusion
             watcher.eyeX = at.getX();
             watcher.eyeY = at.getY() + EYE_HEIGHT;
             watcher.eyeZ = at.getZ();
@@ -475,15 +437,12 @@ public final class Assembly {
             List<Object> packets = new ArrayList<>(count * 3);
             for (int i = 0; i < count; i++)
                 packets.addAll(List.of(glow ? spawnGlow[i] : spawnPlain[i]));
-            // Someone arriving mid-fall sees the pieces where they are now
             if (anySent)
                 for (int i = 0; i < count; i++)
                     packets.add(posePacket(newest(), i, 0));
             Packets.send(player, Packets.bundle(packets));
         }
     }
-
-    // ── Listener view ────────────────────────────────────────────────────────
 
     private record TickView(Simulator sim) implements Listener.Tick {
         @Override public int number() { return sim.tick(); }
@@ -496,5 +455,4 @@ public final class Assembly {
         @Override public boolean asleep(int piece) { return sim.asleep(piece); }
         @Override public boolean broken() { return sim.broken(); }
     }
-
 }

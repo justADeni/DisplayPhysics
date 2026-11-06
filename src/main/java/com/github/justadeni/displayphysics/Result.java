@@ -7,7 +7,6 @@ import org.joml.Quaternionf;
  * from. The displays stay on screen until {@link Assembly#release()}.
  */
 public final class Result {
-
     private final double[] positions;
     private final float[] rotations;
     private final boolean broken;
@@ -59,5 +58,4 @@ public final class Result {
     public Throwable error() {
         return error;
     }
-
 }

@@ -2,7 +2,6 @@ package com.github.justadeni.displayphysics;
 
 /** How an assembly behaves once it is let go. */
 public sealed interface Mode {
-
     /** One solid unit until it comes to rest. */
     Rigid RIGID = new Rigid();
 
@@ -39,5 +38,4 @@ public sealed interface Mode {
             java.util.Objects.requireNonNull(blast);
         }
     }
-
 }

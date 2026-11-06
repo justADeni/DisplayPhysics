@@ -1,9 +1,7 @@
 package com.github.justadeni.displayphysics.sim;
 import com.github.justadeni.displayphysics.sim.kernels.Kernels;
 
-/** Runs scalar and a SIMD kernel set on the benchmark scenes and prints the largest difference per kernel. */
 public class Check {
-
     public static void main(String[] args) {
         String variant = args.length > 0 ? args[0] : "vector";
         for (String scene : new String[]{"mixed", "flying", "resting"})

@@ -16,7 +16,6 @@ import org.bukkit.block.Block;
  * the per-axis {@link #x}, {@link #y} and {@link #z} do the same without a switch.
  */
 public enum XYZ {
-
     X,
     Y,
     Z;
@@ -28,9 +27,9 @@ public enum XYZ {
     private static final int Y_MASK = 0x1FF;
 
     public static long pack(int x, int y, int z) {
-        return ((long) (x & XZ_MASK) << 36)       // x: 27 bits
-                | ((long) (y - MIN_Y & Y_MASK) << 27) // y: 9 bits, offset
-                | (z & XZ_MASK);                      // z: 27 bits
+        return ((long) (x & XZ_MASK) << 36)
+                | ((long) (y - MIN_Y & Y_MASK) << 27)
+                | (z & XZ_MASK);
     }
 
     public static long pack(Location location) {
@@ -71,5 +70,4 @@ public enum XYZ {
     public static long offset(long packed, int dx, int dy, int dz) {
         return pack(x(packed) + dx, y(packed) + dy, z(packed) + dz);
     }
-
 }

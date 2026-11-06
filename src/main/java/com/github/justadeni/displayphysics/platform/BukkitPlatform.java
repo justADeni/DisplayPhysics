@@ -8,12 +8,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Plain Bukkit/Spigot. Packets can be sent from any thread, so the main thread is only used to change
- * blocks; a player's location is read where the caller is.
- */
 public final class BukkitPlatform implements Platform {
-
     private final Plugin plugin;
 
     public BukkitPlatform(Plugin plugin) {
@@ -36,5 +31,4 @@ public final class BukkitPlatform implements Platform {
             return CompletableFuture.completedFuture(null);
         }
     }
-
 }

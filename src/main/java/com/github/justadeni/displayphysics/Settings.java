@@ -4,7 +4,6 @@ import java.util.Objects;
 
 /** Tuning for one simulation. Fluent; every value has a sensible default. */
 public final class Settings {
-
     public Mode mode = Mode.RIGID;
     public float gravity = 9.81f;
     /** Coulomb friction against the terrain. */
@@ -49,5 +48,4 @@ public final class Settings {
     public Settings updateInterval(int ticks) { updateInterval = Math.max(1, ticks); return this; }
     public Settings impactReportSpeed(float v) { impactReportSpeed = v; return this; }
     public Settings autoReleaseSeconds(float v) { autoReleaseSeconds = v; return this; }
-
 }

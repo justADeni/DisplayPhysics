@@ -33,7 +33,6 @@ import java.util.logging.Logger;
  * the Bukkit API is used otherwise. Check {@link #isSupported()} on older servers.
  */
 public final class DisplayPhysics {
-
     private static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "DisplayPhysics-timer");
         thread.setDaemon(true);
@@ -104,5 +103,4 @@ public final class DisplayPhysics {
     static void later(Runnable task, long millis) {
         TIMER.schedule(task, millis, TimeUnit.MILLISECONDS);
     }
-
 }

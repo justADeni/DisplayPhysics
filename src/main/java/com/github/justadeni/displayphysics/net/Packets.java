@@ -17,22 +17,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Builds and sends the block-display packets straight through the server's own classes.
- *
- * <p>Needs a Mojang-mapped server (Paper 1.20.5 or newer, where the NMS classes keep their
- * real names). Everything is resolved once through {@link MethodHandle}s; if any of it is
- * missing, {@link #available()} is {@code false} and nothing else may be called.
- *
- * <p>Packets are plain objects that can be sent to any number of players, from any thread:
- * the server's connection hands them to the network thread itself.
- */
 public final class Packets {
-
     private Packets() {}
 
     private static final String NMS = "net.minecraft.";
-    /** CraftBukkit's package: unversioned on current servers, but read from the running server to be safe. */
     private static final String CRAFT = Bukkit.getServer() != null
             ? Bukkit.getServer().getClass().getPackageName() + "."
             : "org.bukkit.craftbukkit.";
@@ -123,10 +111,6 @@ public final class Packets {
         ROTATION_KEY = rotationKey;
     }
 
-    /**
-     * Reads a static field, trying each name in turn; the first name may also be looked up in
-     * the extra holder class given as the last name when it contains a dot.
-     */
     private static Object staticField(Class<?> owner, String... names) throws Exception {
         Class<?> holder = owner;
         List<String> candidates = new ArrayList<>();
@@ -135,7 +119,6 @@ public final class Packets {
                 try {
                     holder = Class.forName(name);
                 } catch (ClassNotFoundException ignored) {
-                    // not on this version
                 }
             } else {
                 candidates.add(name);
@@ -158,33 +141,23 @@ public final class Packets {
             try {
                 return c.getDeclaredField(name);
             } catch (NoSuchFieldException ignored) {
-                // try the superclass
             }
         }
         return null;
     }
 
-    /** Whether this server can be talked to. If not, nothing else in this class may be called. */
     public static boolean available() {
         return FAILURE == null;
     }
 
-    /** Why {@link #available()} is false, or {@code null}. */
     public static Throwable failure() {
         return FAILURE;
     }
 
-    // ── Building ─────────────────────────────────────────────────────────────
-
-    /**
-     * A fresh entity id that can't clash with any real entity. Taken from an entity the API
-     * creates without adding it to the world, so it comes from the server's own counter.
-     */
     public static int nextEntityId(World world) {
         return world.createEntity(new Location(world, 0, 0, 0), BlockDisplay.class).getEntityId();
     }
 
-    /** The server's own representation of the block, which the display packets carry. */
     public static Object blockState(BlockData data) {
         try {
             return BLOCK_STATE.invoke(data);
@@ -193,7 +166,6 @@ public final class Packets {
         }
     }
 
-    /** Spawns a block display at the given position, showing {@code state}, standing still. */
     public static Object[] spawn(int id, UUID uuid, double x, double y, double z, Object state, float viewRange, int glowRgb) {
         try {
             Object add = ADD_ENTITY.invoke(id, uuid, x, y, z, 0f, 0f, BLOCK_DISPLAY_TYPE, 0, VEC3_ZERO, 0d);
@@ -211,11 +183,6 @@ public final class Packets {
         }
     }
 
-    /**
-     * Moves a display: it interpolates to this pose over {@code ticks} client ticks. The start
-     * delay is sent every time, which is what makes the client restart its interpolation even
-     * when the new pose follows an identical one.
-     */
     public static Object pose(int id, int ticks, Vector3fc translation, Quaternionfc rotation) {
         try {
             List<Object> values = new ArrayList<>(4);
@@ -237,7 +204,6 @@ public final class Packets {
         }
     }
 
-    /** Packets the client applies together, within the same tick. */
     public static Object bundle(List<Object> packets) {
         try {
             return BUNDLE.invoke(packets);
@@ -250,15 +216,12 @@ public final class Packets {
         return DATA_VALUE.invoke(key, value);
     }
 
-    // ── Sending ──────────────────────────────────────────────────────────────
-
     public static void send(Player player, Object packet) {
         try {
             Object connection = CONNECTION.invoke(PLAYER_HANDLE.invoke(player));
             if (connection != null)
                 SEND.invoke(connection, packet);
         } catch (Throwable t) {
-            // A player who just disconnected has no connection any more; nothing to show them.
         }
     }
 
@@ -269,5 +232,4 @@ public final class Packets {
             throw e;
         return new IllegalStateException(t);
     }
-
 }

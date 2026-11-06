@@ -13,20 +13,7 @@ import java.util.Arrays;
 
 import static com.github.justadeni.displayphysics.sim.Tuning.*;
 
-/**
- * SIMD kernels. The terrain kernel works in small static passes over a chunk of pieces that talk through reusable
- * scratch rows only (no vector lives across a method boundary, which keeps C2 from boxing them):
- * <ol>
- *   <li>cull: a piece whose centre voxel has no terrain within one voxel cannot touch anything (flag
- *       {@link Grid#NEAR}); the others are compressed into a candidate list;</li>
- *   <li>probe: the eight corners of the candidates against the grid, one gather each; only the "corner is in a solid
- *       voxel" bit is kept, and the candidates are listed by how many corners that is;</li>
- *   <li>solve, per count: vectors of pieces that all have the same number of solid corners, so no lane idles. The
- *       way out of each voxel is chosen there, once per contact slot, on dense lanes.</li>
- * </ol>
- */
 public final class VectorKernels implements Kernels {
-
     private static final VectorSpecies<Float> F = FloatVector.SPECIES_PREFERRED;
     private static final VectorSpecies<Integer> I = IntVector.SPECIES_PREFERRED;
     private static final int L = F.length();
@@ -36,25 +23,19 @@ public final class VectorKernels implements Kernels {
         VectorVisibility.run(b, from, to, grid, occupancy, sight, out);
     }
 
-    /** Pieces per chunk. */
     private static final int CHUNK = 2048;
     private static final int CAP = CHUNK + 2 * L;
-    /** Group vectors solved side by side, so their dependency chains overlap in the core. */
     private static final int CONTEXTS = 3;
 
-    // Scratch floats per contact slot (one vector each)
     private static final int RX = 0, RY = 1, RZ = 2, NX = 3, NY = 4, NZ = 5, AX = 6, AY = 7, AZ = 8, KN = 9, K1 = 10, K2 = 11,
             BOUNCE = 12, TARGET = 13, ACC_N = 14, ACC_1 = 15, ACC_2 = 16, ACC_P = 17, CN1 = 18, CN2 = 19, C12 = 20, NF = 21;
 
-    // Per-vector state rows
     private static final int VX = 0, VY = 1, VZ = 2, WX = 3, WY = 4, WZ = 5, IM = 6, II = 7, MU = 8, VPX = 9, VPY = 10, VPZ = 11,
             WPX = 12, WPY = 13, WPZ = 14, RES = 15, PX = 16, PY = 17, PZ = 18, C0X = 19, C0Y = 20, C0Z = 21, C1X = 22, C1Y = 23,
             C1Z = 24, C2X = 25, C2Y = 26, C2Z = 27, NS = 28;
 
-    /** Everything one group vector needs while it is solved. Two of them are solved side by side so their dependency chains overlap. */
     private static final class Ctx {
         final int[] idx = new int[L], pidx = new int[L], pos = new int[L];
-        /** The corners still to turn into contacts, and whether a lane got any, per lane. */
         final int[] left = new int[L], got = new int[L];
         final int[] cell = new int[L], code = new int[L];
         final float[] f = new float[8 * NF * L];
@@ -63,11 +44,8 @@ public final class VectorKernels implements Kernels {
     }
 
     private static final class Scratch {
-        /** Candidate piece indices. */
         final int[] cand = new int[CAP];
-        /** Per candidate: bit c set when corner c is inside a solid voxel. */
         final int[] bits = new int[CAP];
-        /** Candidates (positions in cand) with k solid corners: k * CAP + n. */
         final int[] hit = new int[9 * CAP];
         final int[] hitN = new int[9];
         final int[] idx = new int[L], row = new int[L], pi = new int[2 * L];
@@ -100,8 +78,6 @@ public final class VectorKernels implements Kernels {
         return (FloatVector) v.convert(VectorOperators.I2F, 0);
     }
 
-    // ── Terrain ──────────────────────────────────────────────────────────────
-
     @Override
     public void terrain(Bodies b, int from, int to, Grid grid, float dt) {
         Scratch s = SCRATCH.get();
@@ -121,19 +97,13 @@ public final class VectorKernels implements Kernels {
         }
     }
 
-    /** floor(v) as ScalarKernels does it: truncation, minus one where that rounded up (negative values). */
     private static IntVector floor(FloatVector v) {
         IntVector t = trunc(v);
         return t.sub(1, v.compare(VectorOperators.LT, toFloat(t)).cast(I));
     }
 
-    // Rows of the candidate arrays dn: the orientation and position of each candidate
     private static final int DQX = 0, DQY = 1, DQZ = 2, DQW = 3, DPX = 4, DPY = 5, DPZ = 6, ND = 7;
 
-    /**
-     * Pieces whose centre voxel has no exposed terrain within one voxel cannot touch anything. The others are
-     * compressed into the candidate list: their index, orientation and position, densely, so the probe streams.
-     */
     private static int cull(Bodies b, Grid grid, Scratch s, int from, int to) {
         int nc = 0;
         final int[] idx = s.idx, cand = s.cand, nbr = grid.nbr;
@@ -162,7 +132,6 @@ public final class VectorKernels implements Kernels {
             FloatVector.fromArray(F, b.pz, i, m).compress(nf).intoArray(dn, DPZ * CAP + nc);
             nc += count;
         }
-        // The tail of the last probe vector repeats the last candidate, so its gather stays in range
         for (int r = 0; r < ND && nc > 0; r++)
             Arrays.fill(dn, r * CAP + nc, r * CAP + nc + L, dn[r * CAP + nc - 1]);
         return nc;
@@ -189,7 +158,6 @@ public final class VectorKernels implements Kernels {
         }
     }
 
-    // Rows of pc: 0..11 the sums (+-c0 +-c1) for the four sign pairs and three axes, 12..14 c2, 15..17 the position
     private static void corners(int[] nbr, Scratch s, int j0, int sx, int sz, int base) {
         final float[] dn = s.dn, pc = s.pc;
         FloatVector qx = FloatVector.fromArray(F, dn, DQX * CAP + j0), qy = FloatVector.fromArray(F, dn, DQY * CAP + j0);
@@ -199,7 +167,6 @@ public final class VectorKernels implements Kernels {
         FloatVector c0x = yy.add(zz).mul(-2f * CORNER).add(CORNER);
         FloatVector c0y = xy.add(wzq).mul(2f * CORNER), c0z = xz.sub(wyq).mul(2f * CORNER);
         FloatVector c1x = xy.sub(wzq).mul(2f * CORNER), c1y = xx.add(zz).mul(-2f * CORNER).add(CORNER), c1z = yz.add(wxq).mul(2f * CORNER);
-        // (+-c0 +-c1) +- c2, added in the scalar kernel's order, so a corner on a voxel face falls the same way
         c0x.add(c1x).neg().intoArray(pc, 0); c0y.add(c1y).neg().intoArray(pc, L); c0z.add(c1z).neg().intoArray(pc, 2 * L);
         c0x.sub(c1x).intoArray(pc, 3 * L); c0y.sub(c1y).intoArray(pc, 4 * L); c0z.sub(c1z).intoArray(pc, 5 * L);
         c1x.sub(c0x).intoArray(pc, 6 * L); c1y.sub(c0y).intoArray(pc, 7 * L); c1z.sub(c0z).intoArray(pc, 8 * L);
@@ -210,11 +177,9 @@ public final class VectorKernels implements Kernels {
         FloatVector px = FloatVector.fromArray(F, dn, DPX * CAP + j0), py = FloatVector.fromArray(F, dn, DPY * CAP + j0), pz = FloatVector.fromArray(F, dn, DPZ * CAP + j0);
         px.intoArray(pc, 15 * L); py.intoArray(pc, 16 * L); pz.intoArray(pc, 17 * L);
 
-        // The centre voxel: one gather gives which of the 27 voxels around it can be touched
         IntVector ix = floor(px), iy = floor(py), iz = floor(pz);
         iy.mul(sz).add(iz).mul(sx).add(ix).sub(base).intoArray(s.idx, 0);
         IntVector.fromArray(I, nbr, 0, s.idx, 0).intoArray(s.pi, L);
-        // bit of the voxel a corner lies in = 13 + (floor(corner) - floor(centre)) summed with weights 1, 3, 9
         IntVector.broadcast(I, 13).sub(ix.add(iy.mul(3)).add(iz.mul(9))).intoArray(s.pi, 0);
     }
 
@@ -237,7 +202,6 @@ public final class VectorKernels implements Kernels {
 
     private static void solve(Bodies b, Grid grid, Scratch s, int k, int h0, int n, float dt) {
         final Ctx[] cx = s.cx;
-        // Up to CONTEXTS vectors of the group, solved side by side
         final int m = Math.min(CONTEXTS, (n - h0 + L - 1) / L);
         for (int j = 0; j < m; j++)
             load(b, s, cx[j], k, h0 + j * L, n);
@@ -257,7 +221,6 @@ public final class VectorKernels implements Kernels {
             store(b, cx[j]);
     }
 
-    /** Gathers the pieces of one group vector and the rotation columns into the state rows. */
     private static void load(Bodies b, Scratch sc, Ctx s, int k, int h0, int n) {
         final int[] pidx = s.pidx, pos = s.pos;
         final float[] st = s.st;
@@ -310,10 +273,8 @@ public final class VectorKernels implements Kernels {
         derive(s, c, scale);
     }
 
-    // Rows of cs: 0..2 position inside the voxel, 3..5 corner velocity, 6 best distance
     private static final int FX = 0, FY = 1, FZ = 2, UX = 3, UY = 4, UZ = 5, BEST = 6;
 
-    /** The next solid corner of every lane: its offset, the voxel it lies in, where in the voxel, and how fast it moves. */
     private static void locate(Grid grid, Ctx s, int c) {
         final int[] idx = s.idx;
         final float[] st = s.st, f = s.f, cs = s.cs;
@@ -321,7 +282,6 @@ public final class VectorKernels implements Kernels {
 
         IntVector left = IntVector.fromArray(I, s.left, 0);
         left.and(left.sub(1)).intoArray(s.left, 0);
-        // log2 of the lowest set bit through the float exponent
         IntVector cid = toFloat(left.and(left.neg())).reinterpretAsInts().lanewise(VectorOperators.LSHR, 23).sub(127);
         final FloatVector two = FloatVector.broadcast(F, 2f), minusOne = FloatVector.broadcast(F, -1f);
         FloatVector sa = toFloat(cid.and(1)).fma(two, minusOne);
@@ -353,11 +313,6 @@ public final class VectorKernels implements Kernels {
         wx.fma(ry, wy.neg().fma(rx, vz)).intoArray(cs, UZ * L);
     }
 
-    /**
-     * The way out of the voxel: the nearest open face the corner could have entered through (it is not already leaving
-     * through it), in the scalar kernel's order and with its preference for pushing up. Code bits: 1 = x axis,
-     * 2 = y axis, 4 = z axis, 8 = negative direction; no way out leaves code 0.
-     */
     private static void select(Ctx s) {
         final float[] cs = s.cs;
         IntVector cell = IntVector.fromArray(I, s.cell, 0);
@@ -395,7 +350,6 @@ public final class VectorKernels implements Kernels {
         IntVector.fromArray(I, s.got, 0).or(code).intoArray(s.got, 0);
     }
 
-    /** Contact frame, effective masses, bounce and split-impulse targets of the slot; a lane without a way out gets a dead slot. */
     private static void derive(Ctx s, int c, float scale) {
         final float[] st = s.st, f = s.f, cs = s.cs;
         final int o = c * NF * L;
@@ -421,11 +375,9 @@ public final class VectorKernels implements Kernels {
 
         FloatVector vn = FloatVector.fromArray(F, cs, UX * L).fma(nx, FloatVector.fromArray(F, cs, UY * L).fma(ny, FloatVector.fromArray(F, cs, UZ * L).mul(nz)));
         FloatVector bounce = FloatVector.fromArray(F, st, RES * L).neg().mul(vn).blend(zero, vn.compare(VectorOperators.GE, -BOUNCE_THRESHOLD).or(dead));
-        // The +y preference was baked into the distance, so it is added back to the depth
         FloatVector depth = FloatVector.fromArray(F, cs, BEST * L).add(0.05f, code.compare(VectorOperators.EQ, 2).cast(F));
         FloatVector target = depth.sub(SLOP).max(0f).min(MAX_CORRECTION).mul(scale).blend(zero, dead);
 
-        // Coupling of the impulses through the lever arm: -invInertia * (r.e) * (r.f)
         FloatVector rn = rx.fma(nx, ry.fma(ny, rz.mul(nz)));
         FloatVector ni = invInertia.neg();
         ni.mul(rn).mul(r1).intoArray(f, o + CN1 * L);
@@ -439,12 +391,6 @@ public final class VectorKernels implements Kernels {
         Arrays.fill(f, o + ACC_N * L, o + (ACC_P + 1) * L, 0f);
     }
 
-    /**
-     * One sequential-impulse step of one contact slot: the normal, then both friction directions. The velocity of the
-     * contact point is computed once; an impulse along axis e changes its component along another axis f by
-     * {@code -invInertia * j * (r.e) * (r.f)} (the invMass and r.r terms cancel for orthogonal axes), which the
-     * precomputed couplings CN1, CN2 and C12 carry, so v and w are updated once at the end.
-     */
     private static void iterateStep(Ctx s, int c) {
         final float[] f = s.f, st = s.st;
         final int o = c * NF * L;
@@ -454,12 +400,10 @@ public final class VectorKernels implements Kernels {
         FloatVector nx = FloatVector.fromArray(F, f, o + NX * L), ny = FloatVector.fromArray(F, f, o + NY * L), nz = FloatVector.fromArray(F, f, o + NZ * L);
         FloatVector ax = FloatVector.fromArray(F, f, o + AX * L), ay = FloatVector.fromArray(F, f, o + AY * L), az = FloatVector.fromArray(F, f, o + AZ * L);
 
-        // Velocity of the contact point
         FloatVector ux = wy.fma(rz, wz.neg().fma(ry, vx));
         FloatVector uy = wz.fma(rx, wx.neg().fma(rz, vy));
         FloatVector uz = wx.fma(ry, wy.neg().fma(rx, vz));
 
-        // Normal impulse first, so friction has something to be a fraction of
         FloatVector vd = ux.fma(nx, uy.fma(ny, uz.mul(nz)));
         FloatVector accN = FloatVector.fromArray(F, f, o + ACC_N * L);
         FloatVector nextN = FloatVector.fromArray(F, f, o + BOUNCE * L).sub(vd).fma(FloatVector.fromArray(F, f, o + KN * L), accN).max(0f);
@@ -467,21 +411,18 @@ public final class VectorKernels implements Kernels {
         FloatVector dn = nextN.sub(accN);
         FloatVector maxF = FloatVector.fromArray(F, st, MU * L).mul(nextN), minF = maxF.neg();
 
-        // Tangent 1: (az, ax, ay)
         FloatVector vt = ux.fma(az, uy.fma(ax, uz.mul(ay))).add(dn.mul(FloatVector.fromArray(F, f, o + CN1 * L)));
         FloatVector acc = FloatVector.fromArray(F, f, o + ACC_1 * L);
         FloatVector next = vt.neg().fma(FloatVector.fromArray(F, f, o + K1 * L), acc).max(minF).min(maxF);
         next.intoArray(f, o + ACC_1 * L);
         FloatVector d1 = next.sub(acc);
 
-        // Tangent 2: (ay, az, ax)
         vt = ux.fma(ay, uy.fma(az, uz.mul(ax))).add(dn.fma(FloatVector.fromArray(F, f, o + CN2 * L), d1.mul(FloatVector.fromArray(F, f, o + C12 * L))));
         acc = FloatVector.fromArray(F, f, o + ACC_2 * L);
         next = vt.neg().fma(FloatVector.fromArray(F, f, o + K2 * L), acc).max(minF).min(maxF);
         next.intoArray(f, o + ACC_2 * L);
         FloatVector d2 = next.sub(acc);
 
-        // The total impulse, applied once
         FloatVector jx = nx.fma(dn, az.fma(d1, ay.mul(d2)));
         FloatVector jy = ny.fma(dn, ax.fma(d1, az.mul(d2)));
         FloatVector jz = nz.fma(dn, ay.fma(d1, ax.mul(d2)));
@@ -530,11 +471,8 @@ public final class VectorKernels implements Kernels {
         FloatVector.fromArray(F, st, WX * L).intoArray(b.wx, 0, pidx, 0); FloatVector.fromArray(F, st, WY * L).intoArray(b.wy, 0, pidx, 0); FloatVector.fromArray(F, st, WZ * L).intoArray(b.wz, 0, pidx, 0);
         FloatVector.fromArray(F, st, VPX * L).intoArray(b.vpx, 0, pidx, 0); FloatVector.fromArray(F, st, VPY * L).intoArray(b.vpy, 0, pidx, 0); FloatVector.fromArray(F, st, VPZ * L).intoArray(b.vpz, 0, pidx, 0);
         FloatVector.fromArray(F, st, WPX * L).intoArray(b.wpx, 0, pidx, 0); FloatVector.fromArray(F, st, WPY * L).intoArray(b.wpy, 0, pidx, 0); FloatVector.fromArray(F, st, WPZ * L).intoArray(b.wpz, 0, pidx, 0);
-        // Only a piece that got a real contact counts as touching
         FloatVector.broadcast(F, 1f).intoArray(b.touch, 0, pidx, 0, IntVector.fromArray(I, s.got, 0).compare(VectorOperators.NE, 0).cast(F));
     }
-
-    // ── Forces ───────────────────────────────────────────────────────────────
 
     private static FloatVector ld(float[] a, int i, VectorMask<Float> m) {
         return m == null ? FloatVector.fromArray(F, a, i) : FloatVector.fromArray(F, a, i, m);
@@ -588,8 +526,6 @@ public final class VectorKernels implements Kernels {
         st(wx.mul(angular), b.wx, i, m); st(wy.mul(angular), b.wy, i, m); st(wz.mul(angular), b.wz, i, m);
     }
 
-    // ── Integration ──────────────────────────────────────────────────────────
-
     @Override
     public void integrate(Bodies b, int from, int to, float dt) {
         int bound = from + F.loopBound(to - from);
@@ -599,7 +535,6 @@ public final class VectorKernels implements Kernels {
             integrateTail(b, bound, F.indexInRange(bound, to), dt);
     }
 
-    /** Same bit trick and Newton steps as {@code ScalarKernels.inverseSquareRoot}. */
     private static FloatVector isqrt(FloatVector x) {
         FloatVector half = x.mul(0.5f), nhalf = half.neg();
         FloatVector y = IntVector.broadcast(I, 0x5f3759df).sub(x.reinterpretAsInts().lanewise(VectorOperators.ASHR, 1)).reinterpretAsFloats();
@@ -608,7 +543,6 @@ public final class VectorKernels implements Kernels {
         return y;
     }
 
-    /** One full vector of pieces (the masked twin below handles the last, partial one). */
     private static void integrateBlock(Bodies b, int i, float dt) {
         FloatVector vx = FloatVector.fromArray(F, b.vx, i), vy = FloatVector.fromArray(F, b.vy, i), vz = FloatVector.fromArray(F, b.vz, i);
         FloatVector wx = FloatVector.fromArray(F, b.wx, i), wy = FloatVector.fromArray(F, b.wy, i), wz = FloatVector.fromArray(F, b.wz, i);
@@ -624,7 +558,6 @@ public final class VectorKernels implements Kernels {
         vy.add(FloatVector.fromArray(F, b.vpy, i)).fma(dtv, FloatVector.fromArray(F, b.py, i)).intoArray(b.py, i);
         vz.add(FloatVector.fromArray(F, b.vpz, i)).fma(dtv, FloatVector.fromArray(F, b.pz, i)).intoArray(b.pz, i);
 
-        // q += dt/2 * (w, 0) * q, renormalised
         FloatVector ax = wx.add(FloatVector.fromArray(F, b.wpx, i)), ay = wy.add(FloatVector.fromArray(F, b.wpy, i)), az = wz.add(FloatVector.fromArray(F, b.wpz, i));
         FloatVector nax = ax.neg(), nay = ay.neg(), naz = az.neg();
         FloatVector qx = FloatVector.fromArray(F, b.qx, i), qy = FloatVector.fromArray(F, b.qy, i), qz = FloatVector.fromArray(F, b.qz, i), qw = FloatVector.fromArray(F, b.qw, i);
@@ -632,7 +565,6 @@ public final class VectorKernels implements Kernels {
         FloatVector nqy = nax.fma(qz, ay.fma(qw, az.mul(qx))).fma(hh, qy);
         FloatVector nqz = ax.fma(qy, nay.fma(qx, az.mul(qw))).fma(hh, qz);
         FloatVector nqw = nax.fma(qx, nay.fma(qy, naz.mul(qz))).fma(hh, qw);
-        // The quaternion is within a few percent of unit length, where 1/sqrt(n) is 1.5 - n/2 to better than 1e-3
         FloatVector inv = FloatVector.broadcast(F, -0.5f).fma(nqx.fma(nqx, nqy.fma(nqy, nqz.fma(nqz, nqw.mul(nqw)))), FloatVector.broadcast(F, 1.5f));
         nqx.mul(inv).intoArray(b.qx, i); nqy.mul(inv).intoArray(b.qy, i); nqz.mul(inv).intoArray(b.qz, i); nqw.mul(inv).intoArray(b.qw, i);
 
@@ -642,7 +574,6 @@ public final class VectorKernels implements Kernels {
     }
 
     private static void integrateTail(Bodies b, int i, VectorMask<Float> m, float dt) {
-        // (generated from integrateBlock by adding the mask to every access)
         FloatVector vx = FloatVector.fromArray(F, b.vx, i, m), vy = FloatVector.fromArray(F, b.vy, i, m), vz = FloatVector.fromArray(F, b.vz, i, m);
         FloatVector wx = FloatVector.fromArray(F, b.wx, i, m), wy = FloatVector.fromArray(F, b.wy, i, m), wz = FloatVector.fromArray(F, b.wz, i, m);
         FloatVector speedSquared = vx.fma(vx, vy.fma(vy, vz.mul(vz)));
@@ -657,7 +588,6 @@ public final class VectorKernels implements Kernels {
         vy.add(FloatVector.fromArray(F, b.vpy, i, m)).fma(dtv, FloatVector.fromArray(F, b.py, i, m)).intoArray(b.py, i, m);
         vz.add(FloatVector.fromArray(F, b.vpz, i, m)).fma(dtv, FloatVector.fromArray(F, b.pz, i, m)).intoArray(b.pz, i, m);
 
-        // q += dt/2 * (w, 0) * q, renormalised
         FloatVector ax = wx.add(FloatVector.fromArray(F, b.wpx, i, m)), ay = wy.add(FloatVector.fromArray(F, b.wpy, i, m)), az = wz.add(FloatVector.fromArray(F, b.wpz, i, m));
         FloatVector nax = ax.neg(), nay = ay.neg(), naz = az.neg();
         FloatVector qx = FloatVector.fromArray(F, b.qx, i, m), qy = FloatVector.fromArray(F, b.qy, i, m), qz = FloatVector.fromArray(F, b.qz, i, m), qw = FloatVector.fromArray(F, b.qw, i, m);
@@ -665,7 +595,6 @@ public final class VectorKernels implements Kernels {
         FloatVector nqy = nax.fma(qz, ay.fma(qw, az.mul(qx))).fma(hh, qy);
         FloatVector nqz = ax.fma(qy, nay.fma(qx, az.mul(qw))).fma(hh, qz);
         FloatVector nqw = nax.fma(qx, nay.fma(qy, naz.mul(qz))).fma(hh, qw);
-        // The quaternion is within a few percent of unit length, where 1/sqrt(n) is 1.5 - n/2 to better than 1e-3
         FloatVector inv = FloatVector.broadcast(F, -0.5f).fma(nqx.fma(nqx, nqy.fma(nqy, nqz.fma(nqz, nqw.mul(nqw)))), FloatVector.broadcast(F, 1.5f));
         nqx.mul(inv).intoArray(b.qx, i, m); nqy.mul(inv).intoArray(b.qy, i, m); nqz.mul(inv).intoArray(b.qz, i, m); nqw.mul(inv).intoArray(b.qw, i, m);
 
@@ -674,7 +603,6 @@ public final class VectorKernels implements Kernels {
         zero.intoArray(b.wpx, i, m); zero.intoArray(b.wpy, i, m); zero.intoArray(b.wpz, i, m);
     }
 
-    /** The rare case: some piece moves or spins faster than the limits. Does the whole step for {@code m} (null: all lanes). */
     private static void integrateClamped(Bodies b, int i, VectorMask<Float> m, float dt) {
         FloatVector vx = ld(b.vx, i, m), vy = ld(b.vy, i, m), vz = ld(b.vz, i, m);
         FloatVector wx = ld(b.wx, i, m), wy = ld(b.wy, i, m), wz = ld(b.wz, i, m);
@@ -707,11 +635,8 @@ public final class VectorKernels implements Kernels {
         st(zero, b.wpx, i, m); st(zero, b.wpy, i, m); st(zero, b.wpz, i, m);
     }
 
-    // ── Calm ─────────────────────────────────────────────────────────────────
-
     @Override
     public void calm(Bodies b, int from, int to) {
         Kernels.scalar().calm(b, from, to);
     }
-
 }

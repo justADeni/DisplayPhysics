@@ -1,6 +1,5 @@
 package com.github.justadeni.displayphysics.sim;
 
-/** Quick single-process timing of one kernel: Run variant scene count kernel(terrain|forces|integrate) seconds. */
 public class Run {
     public static void main(String[] a) {
         var s = Check.make(a[1], Integer.parseInt(a[2]), a[0]);

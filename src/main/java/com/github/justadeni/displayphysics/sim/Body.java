@@ -4,15 +4,7 @@ import org.joml.Matrix3f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-/**
- * A rigid body: position of its centre of mass, orientation and velocities.
- *
- * <p>{@code vp}/{@code wp} are split-impulse pseudo velocities. They push the body
- * out of the terrain for one step without adding energy, so penetration fixes
- * never turn into bounces.
- */
 final class Body {
-
     final Vector3f x = new Vector3f();
     final Vector3f v = new Vector3f();
     final Vector3f w = new Vector3f();
@@ -22,7 +14,6 @@ final class Body {
 
     float invMass;
     final Matrix3f invInertiaBody = new Matrix3f();
-    /** World-space inverse inertia, refreshed by {@link #updateInertia()}. */
     final Matrix3f invInertia = new Matrix3f();
 
     private final Matrix3f rot = new Matrix3f();
@@ -34,13 +25,11 @@ final class Body {
 
     void updateInertia() {
         q.get(rot);
-        // R * I^-1 * R^T
         rot.mul(invInertiaBody, tmp);
         rot.transpose(rotT);
         tmp.mul(rotT, invInertia);
     }
 
-    /** Velocity of the point at offset {@code r} from the centre of mass. */
     Vector3f velocityAt(Vector3f r, Vector3f out) {
         return w.cross(r, out).add(v);
     }
@@ -63,7 +52,6 @@ final class Body {
         wp.add(scratch);
     }
 
-    /** Inverse effective mass of the body along {@code d} at offset {@code r}. */
     float inverseEffectiveMass(Vector3f r, Vector3f d) {
         r.cross(d, scratch);
         invInertia.transform(scratch);
@@ -71,7 +59,6 @@ final class Body {
         return invMass + scratch2.dot(d);
     }
 
-    /** Nothing simulated should ever move faster than this; a hard stop for solver blow-ups. */
     private static final float MAX_SPEED = 40f, MAX_SPIN = 25f;
 
     void integrate(float dt) {
@@ -92,5 +79,4 @@ final class Body {
         vp.zero();
         wp.zero();
     }
-
 }

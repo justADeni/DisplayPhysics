@@ -5,12 +5,9 @@ import com.github.justadeni.displayphysics.TerrainSource;
 
 import java.util.SplittableRandom;
 
-/** The workload every benchmark measures: a cloud of pieces blown outward above flat ground, then landing and settling. */
 public final class Scenario {
-
     private Scenario() {}
 
-    /** Solid below y = 64, air above. */
     public static final TerrainSource FLAT = new TerrainSource() {
         @Override
         public byte classify(int x, int y, int z) {
@@ -28,18 +25,14 @@ public final class Scenario {
         }
     };
 
-    /** Where the cloud starts, relative to the origin block (which sits on the ground at y = 64). */
     public static final int ORIGIN_X = 0, ORIGIN_Y = 64, ORIGIN_Z = 0;
 
-    /** Piece positions (block corners, relative to the origin) and launch velocities for {@code count} pieces. */
     public record Cloud(float[] x, float[] y, float[] z, float[] vx, float[] vy, float[] vz, boolean[] hard) {
-
         public int count() {
             return x.length;
         }
     }
 
-    /** A lattice of roughly cubic shape, 6 blocks above the ground, thrown away from its centre. */
     public static Cloud cloud(int count, long seed) {
         int side = (int) Math.ceil(Math.cbrt(count));
         var random = new SplittableRandom(seed);
@@ -64,7 +57,6 @@ public final class Scenario {
         return cloud;
     }
 
-    /** The cloud as the existing object-based debris engine wants it. */
     public static Debris debris(Cloud cloud) {
         int n = cloud.count();
         var pieces = new Body[n];
@@ -79,7 +71,6 @@ public final class Scenario {
         return new Debris(terrain, pieces, cloud.hard(), 9.81f, 0.6f, 0.25f, 0f);
     }
 
-    /** The cloud as the flat-array debris engine wants it. */
     public static FlatDebris flat(Cloud cloud, Kernels kernels) {
         int n = cloud.count();
         var bodies = new Bodies(n);
@@ -94,5 +85,4 @@ public final class Scenario {
         }
         return new FlatDebris(bodies, FLAT, ORIGIN_X, ORIGIN_Y, ORIGIN_Z, 9.81f, 0.6f, 0f, kernels);
     }
-
 }

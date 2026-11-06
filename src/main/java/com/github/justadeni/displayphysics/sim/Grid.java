@@ -5,24 +5,9 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.util.Arrays;
 
-/**
- * The terrain around the moving pieces as one dense {@code byte} array, x fastest. A voxel lookup is an
- * array index (no hashing, no pointer chasing), and a SIMD kernel can gather from it.
- *
- * <p>Each byte holds the voxel's type in its low two bits and, for a solid voxel, one bit per face that
- * opens onto a non-solid neighbour. A contact probe therefore needs one fetch to know both that it is inside
- * a solid voxel and which ways out exist, instead of seven.
- *
- * <p>Coordinates are relative to the simulation's origin block. The grid covers a box around the pieces and
- * is rebuilt, with some slack, when they leave it; it is refilled when the host's world copy changes.
- * Pieces that came to rest are written in as solid voxels, so they keep stopping what lands on them
- * without costing anything per tick.
- */
 public final class Grid {
-
     public static final byte AIR = TerrainSource.AIR, SOLID = TerrainSource.SOLID, LIQUID = TerrainSource.LIQUID;
     public static final int TYPE_MASK = 3;
-    /** The face bits of a solid voxel: set when the neighbour on that side is not solid. */
     public static final int OPEN_PX = 4, OPEN_NX = 8, OPEN_PY = 16, OPEN_NY = 32, OPEN_PZ = 64, OPEN_NZ = 128;
 
     private final TerrainSource source;
@@ -32,19 +17,8 @@ public final class Grid {
     private boolean dirty = true;
 
     public byte[] cells = new byte[0];
-    /**
-     * The same voxels as ints (unsigned bytes) for SIMD gathers, which have no byte form; kept in step with
-     * {@link #cells}. Do not write to it.
-     */
     public int[] wide = new int[0];
-    /**
-     * Per voxel, which of the 27 voxels around it (itself included) are solid with at least one open face: bit
-     * {@code (dx + 1) + 3 * (dy + 1) + 9 * (dz + 1)} for the voxel at offset (dx, dy, dz). Only such voxels can give a
-     * corner a contact, so a SIMD probe reads one entry per piece instead of one per corner, and zero means "nothing
-     * within one voxel". It is kept conservative: filling sets it, {@link #markResting} only ever adds bits.
-     */
     public int[] nbr = new int[0];
-    /** The lowest covered voxel and the extent of the box, in voxels. */
     public int x0, y0, z0, sx, sy, sz;
 
     public Grid(TerrainSource source, int ox, int oy, int oz) {
@@ -56,12 +30,10 @@ public final class Grid {
         this.maxY = source.maxY();
     }
 
-    /** The host's copy of the world changed: refill before the next use. */
     public void invalidate() {
         dirty = true;
     }
 
-    /** Makes sure voxels {@code [minX, maxX] x [minY, maxY] x [minZ, maxZ]} are covered and up to date. */
     public void ensure(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
         boolean covered = sx > 0 && minX >= x0 && minY >= y0 && minZ >= z0
                 && maxX < x0 + sx && maxY < y0 + sy && maxZ < z0 + sz;
@@ -72,7 +44,6 @@ public final class Grid {
             return;
         }
 
-        // Grow with slack, so a cloud that keeps spreading doesn't rebuild every tick
         int padX = 4 + (maxX - minX) / 4, padY = 4 + (maxY - minY) / 4, padZ = 4 + (maxZ - minZ) / 4;
         x0 = minX - padX;
         y0 = minY - padY;
@@ -93,7 +64,6 @@ public final class Grid {
         for (int y = y0; y < y0 + sy; y++) {
             int worldY = y + oy;
             if (worldY < minY || worldY >= maxY) {
-                // Below the world is solid, above it is open: the whole layer at once
                 Arrays.fill(cells, index, index + sx * sz, worldY < minY ? SOLID : AIR);
                 index += sx * sz;
                 continue;
@@ -121,10 +91,8 @@ public final class Grid {
         dirty = false;
     }
 
-    /** Whether any covered voxel is liquid (so the SIMD forces kernel can skip the buoyancy lookup when not). */
     public boolean liquid;
 
-    /** The int view for gathers (see {@link #wide}). */
     public int[] wide() {
         return wide;
     }
@@ -140,7 +108,6 @@ public final class Grid {
             }
     }
 
-    /** Tells the 27 voxels around the exposed solid voxel (grid-relative x, y, z) about it. */
     private void markExposed(int x, int y, int z) {
         for (int dy = -1; dy <= 1; dy++) {
             if (y + dy < 0 || y + dy >= sy)
@@ -151,13 +118,11 @@ public final class Grid {
                 int row = (y + dy) * sx * sz + (z + dz) * sx;
                 for (int dx = -1; dx <= 1; dx++)
                     if (x + dx >= 0 && x + dx < sx)
-                        // From the neighbour's point of view the solid voxel is at offset (-dx, -dy, -dz)
                         nbr[row + x + dx] |= 1 << ((1 - dx) + 3 * (1 - dy) + 9 * (1 - dz));
             }
         }
     }
 
-    /** Fills in the face bits of every solid voxel. Outside the box counts as open. */
     private void addOpenFaces() {
         int strideZ = sx, strideY = sx * sz;
         for (int y = 0; y < sy; y++)
@@ -183,12 +148,10 @@ public final class Grid {
         return ((y - y0) * sz + (z - z0)) * sx + (x - x0);
     }
 
-    /** The voxel's byte, unsigned: type in the low two bits, face bits above. The voxel must be inside the covered box. */
     public int cell(int x, int y, int z) {
         return cells[index(x, y, z)] & 0xFF;
     }
 
-    /** Writes a piece that came to rest into the terrain, for good (it survives refills). */
     public void markResting(int x, int y, int z) {
         resting.add(x);
         resting.add(y);
@@ -196,7 +159,6 @@ public final class Grid {
         setSolid(x, y, z);
     }
 
-    /** Makes a voxel solid and closes the matching face of each solid neighbour. */
     private void setSolid(int x, int y, int z) {
         if (x < x0 || x >= x0 + sx || y < y0 || y >= y0 + sy || z < z0 || z >= z0 + sz)
             return;
@@ -224,5 +186,4 @@ public final class Grid {
         int i = (int) v;
         return v < i ? i - 1 : i;
     }
-
 }

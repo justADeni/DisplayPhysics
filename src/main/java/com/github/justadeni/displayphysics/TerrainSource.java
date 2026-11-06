@@ -11,7 +11,6 @@ import java.util.concurrent.CompletableFuture;
  * until {@link #refresh()} completes.
  */
 public interface TerrainSource {
-
     /** Nothing there: pieces pass through. */
     byte AIR = 0;
     /** Pieces collide with it. */
@@ -42,5 +41,4 @@ public interface TerrainSource {
     default long ageMillis() {
         return 0L;
     }
-
 }

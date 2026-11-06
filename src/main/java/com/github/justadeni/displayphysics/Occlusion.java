@@ -29,7 +29,6 @@ package com.github.justadeni.displayphysics;
  */
 public record Occlusion(float maxDistance, float spacing, int everyTicks, boolean pieces,
                         float verticalFov, float aspectRatio, float margin) {
-
     public Occlusion {
         if (!(maxDistance > 0f))
             throw new IllegalArgumentException("maxDistance must be positive: " + maxDistance);
@@ -72,5 +71,4 @@ public record Occlusion(float maxDistance, float spacing, int everyTicks, boolea
         double toCorner = Math.atan(Math.sqrt(vertical * vertical + horizontal * horizontal));
         return Math.min(Math.PI, toCorner + Math.toRadians(Math.max(0f, margin)));
     }
-
 }
