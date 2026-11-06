@@ -111,7 +111,7 @@ drops to that height. The samples that are still taken are the same ones as befo
 pieces occluding). Moving pieces are added to a copy of the levels for the call.
 
 `KernelBenchmark.visibility` against `visibilityFlat` (the same kernel without the pyramid), 16384 pieces, one pinned
-thread, microseconds per call. `-Pterrain` is flat, hills (sine surface, about 15 blocks of relief) or forest (one pillar
+thread, microseconds per call. JMH parameter `terrain` is flat, hills (sine surface, about 15 blocks of relief) or forest (one pillar
 in 16 columns, up to 17 high):
 
 | Terrain | Marching every sample | With the pyramid |
