@@ -76,6 +76,7 @@ new Settings()
     .maxDuration(30f)                  // seconds before the simulation stops
     .removeBlocks(true)                // (default) remove the real blocks when the simulation starts
     .turnIntoBlocks(false)             // place the pieces as real blocks where they rest, then release the displays
+    .blocksPerTick(500)                // blocks removed or placed per chunk and tick, so big assemblies don't stall one
     .occlusion(Occlusion.standard())   // skip pieces a player cannot see
     .simd(true);                       // use the Vector API when the JVM has it
 ```

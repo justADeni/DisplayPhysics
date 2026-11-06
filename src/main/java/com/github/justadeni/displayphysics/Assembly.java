@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.IntConsumer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -145,7 +146,7 @@ public final class Assembly {
             try {
                 if (settings.removeBlocks) {
                     spawned.join();
-                    removeBlocks();
+                    removeBlocks(settings.blocksPerTick);
                 }
                 future.complete(run(hinge, settings, terrain, listener));
             } catch (Throwable t) {
@@ -155,44 +156,56 @@ public final class Assembly {
         return future;
     }
 
-    private void removeBlocks() {
-        Map<Long, List<Piece>> byChunk = new HashMap<>();
-        for (Piece piece : pieces)
-            byChunk.computeIfAbsent(((long) (piece.x() >> 4) << 32) | ((piece.z() >> 4) & 0xFFFFFFFFL), k -> new ArrayList<>()).add(piece);
-        for (List<Piece> group : byChunk.values()) {
-            Piece first = group.get(0);
-            platform.runAt(world, first.x(), first.z(), () -> {
-                for (Piece piece : group)
-                    world.getBlockAt(piece.x(), piece.y(), piece.z()).setType(Material.AIR, false);
-            });
+    private void removeBlocks(int perTick) {
+        int[] bx = new int[count], bz = new int[count];
+        for (int i = 0; i < count; i++) {
+            bx[i] = pieces.get(i).x();
+            bz[i] = pieces.get(i).z();
         }
+        changeBlocks(bx, bz, perTick,
+                i -> world.getBlockAt(pieces.get(i).x(), pieces.get(i).y(), pieces.get(i).z()).setType(Material.AIR, false), null);
     }
 
-    private void placeBlocks(double[] positions) {
-        Map<Long, List<Integer>> byChunk = new HashMap<>();
+    private void placeBlocks(double[] positions, int perTick) {
         int[] bx = new int[count], by = new int[count], bz = new int[count];
         for (int i = 0; i < count; i++) {
             bx[i] = (int) Math.floor(positions[i * 3]);
             by[i] = (int) Math.floor(positions[i * 3 + 1]);
             bz[i] = (int) Math.floor(positions[i * 3 + 2]);
+        }
+        changeBlocks(bx, bz, perTick, i -> {
+            var block = world.getBlockAt(bx[i], by[i], bz[i]);
+            if (block.getType().isAir() || block.isReplaceable())
+                block.setBlockData(pieces.get(i).data(), false);
+        }, this::release);
+    }
+
+    private void changeBlocks(int[] bx, int[] bz, int perTick, IntConsumer action, Runnable whenDone) {
+        Map<Long, List<Integer>> byChunk = new HashMap<>();
+        for (int i = 0; i < count; i++)
             byChunk.computeIfAbsent(((long) (bx[i] >> 4) << 32) | ((bz[i] >> 4) & 0xFFFFFFFFL), k -> new ArrayList<>()).add(i);
-        }
         AtomicInteger remaining = new AtomicInteger(byChunk.size());
-        for (List<Integer> group : byChunk.values()) {
-            int first = group.get(0);
-            platform.runAt(world, bx[first], bz[first], () -> {
+        for (List<Integer> group : byChunk.values())
+            changeSlice(group, 0, bx, bz, perTick, action, remaining, whenDone);
+    }
+
+    private void changeSlice(List<Integer> group, int from, int[] bx, int[] bz, int perTick, IntConsumer action,
+                             AtomicInteger remaining, Runnable whenDone) {
+        int first = group.get(0);
+        platform.runAt(world, bx[first], bz[first], () -> {
+            int to = Math.min(group.size(), from + perTick);
+            for (int k = from; k < to; k++) {
                 try {
-                    for (int i : group) {
-                        var block = world.getBlockAt(bx[i], by[i], bz[i]);
-                        if (block.getType().isAir() || block.isReplaceable())
-                            block.setBlockData(pieces.get(i).data(), false);
-                    }
-                } finally {
-                    if (remaining.decrementAndGet() == 0)
-                        release();
+                    action.accept(group.get(k));
+                } catch (RuntimeException e) {
+                    logger.log(Level.WARNING, "Could not change a block", e);
                 }
-            });
-        }
+            }
+            if (to < group.size())
+                changeSlice(group, to, bx, bz, perTick, action, remaining, whenDone);
+            else if (remaining.decrementAndGet() == 0 && whenDone != null)
+                whenDone.run();
+        });
     }
 
     /** Removes the displays from every client and stops a running simulation. Safe to call twice. */
@@ -293,7 +306,7 @@ public final class Assembly {
         }
 
         if (settings.turnIntoBlocks)
-            placeBlocks(positions);
+            placeBlocks(positions, settings.blocksPerTick);
         else
             DisplayPhysics.later(this::release, (long) (settings.autoReleaseSeconds * 1000f));
         return new Result(positions, rotations, sim.broken(), sim.tick(), error);

@@ -20,6 +20,11 @@ public final class Settings {
     public boolean removeBlocks = true;
     /** Whether the pieces are placed as real blocks where they came to rest, after which the displays are released. */
     public boolean turnIntoBlocks = false;
+    /**
+     * How many blocks are removed or placed per chunk and server tick. Larger assemblies take several ticks instead
+     * of stalling one; the displays cover the gap.
+     */
+    public int blocksPerTick = 500;
     /** Hide pieces from players who can't see them, or {@code null} to send everything to everyone. */
     public Occlusion occlusion = null;
     /** Hard cap on the whole simulation, in seconds. */
@@ -38,6 +43,7 @@ public final class Settings {
     public Settings simd(boolean v) { simd = v; return this; }
     public Settings removeBlocks(boolean v) { removeBlocks = v; return this; }
     public Settings turnIntoBlocks(boolean v) { turnIntoBlocks = v; return this; }
+    public Settings blocksPerTick(int v) { blocksPerTick = Math.max(1, v); return this; }
     public Settings gravity(float v) { gravity = v; return this; }
     public Settings friction(float v) { friction = v; return this; }
     public Settings bounciness(float v) { bounciness = v; return this; }

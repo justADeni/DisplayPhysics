@@ -17,10 +17,7 @@ public final class BukkitPlatform implements Platform {
 
     @Override
     public void runAt(World world, int blockX, int blockZ, Runnable task) {
-        if (Bukkit.isPrimaryThread())
-            task.run();
-        else
-            Bukkit.getScheduler().runTask(plugin, task);
+        Bukkit.getScheduler().runTask(plugin, task);
     }
 
     @Override
